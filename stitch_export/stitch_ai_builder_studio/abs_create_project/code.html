@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Builder Studio - Create Project</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary": "#003824",
+                    "outline-variant": "#464555",
+                    "on-error": "#690005",
+                    "surface-container-lowest": "#0e0e0e",
+                    "error-container": "#93000a",
+                    "tertiary-container": "#006e4b",
+                    "inverse-on-surface": "#313030",
+                    "tertiary-fixed-dim": "#4edea3",
+                    "inverse-surface": "#e5e2e1",
+                    "on-primary-fixed": "#0f0069",
+                    "on-error-container": "#ffdad6",
+                    "surface-container": "#201f1f",
+                    "secondary-container": "#00a2e6",
+                    "secondary-fixed": "#c9e6ff",
+                    "on-secondary-container": "#00344e",
+                    "on-tertiary-fixed": "#002113",
+                    "surface-dim": "#131313",
+                    "surface-tint": "#c3c0ff",
+                    "inverse-primary": "#4d44e3",
+                    "surface-container-low": "#1c1b1b",
+                    "on-tertiary-container": "#67f4b7",
+                    "secondary-fixed-dim": "#89ceff",
+                    "secondary": "#89ceff",
+                    "on-surface-variant": "#c7c4d8",
+                    "outline": "#918fa1",
+                    "on-secondary-fixed-variant": "#004c6e",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "surface-bright": "#393939",
+                    "on-tertiary-fixed-variant": "#005236",
+                    "surface-variant": "#353534",
+                    "surface-container-high": "#2a2a2a",
+                    "primary": "#c3c0ff",
+                    "surface-container-highest": "#353534",
+                    "on-primary-container": "#dad7ff",
+                    "surface": "#131313",
+                    "on-background": "#e5e2e1",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "error": "#ffb4ab",
+                    "background": "#131313",
+                    "on-surface": "#e5e2e1",
+                    "on-primary": "#1d00a5",
+                    "on-secondary": "#00344d",
+                    "primary-container": "#4f46e5",
+                    "tertiary": "#4edea3",
+                    "on-secondary-fixed": "#001e2f",
+                    "primary-fixed": "#e2dfff",
+                    "tertiary-fixed": "#6ffbbe"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-max": "1440px",
+                    "xl": "32px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "lg": "24px",
+                    "base": "8px",
+                    "sm": "8px",
+                    "xs": "4px"
+            },
+            "fontFamily": {
+                    "headline-sm": [
+                            "Geist"
+                    ],
+                    "display-lg": [
+                            "Geist"
+                    ],
+                    "code-md": [
+                            "JetBrains Mono"
+                    ],
+                    "body-md": [
+                            "Geist"
+                    ],
+                    "body-sm": [
+                            "Geist"
+                    ],
+                    "headline-md": [
+                            "Geist"
+                    ],
+                    "label-caps": [
+                            "Geist"
+                    ]
+            },
+            "fontSize": {
+                    "headline-sm": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "display-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "code-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-md": [
+                            "15px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-sm": [
+                            "13px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0A0A0A; /* Deep workspace background */
+        }
+        /* Custom Scrollbar for dark theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0A0A0A; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2a2a2a; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #353534; 
+        }
+    </style>
+</head>
+<body class="text-on-background font-body-md h-screen flex flex-col md:flex-row overflow-hidden">
+<!-- SideNavBar (Desktop) -->
+<nav aria-label="Sidebar Navigation" class="hidden md:flex flex-col w-64 bg-surface-container h-full p-md border-r border-surface-container-lowest shrink-0">
+<div class="mb-xl px-md">
+<h1 class="font-headline-sm text-headline-sm text-on-surface">Project Workspace</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-xs">v1.0.4-alpha</p>
+</div>
+<button class="mb-lg w-full bg-primary-container text-white py-sm px-md rounded flex justify-center items-center gap-sm border-t border-white/5 shadow-sm transition-all hover:opacity-90">
+<span class="material-symbols-outlined" style="font-size: 18px;">add</span>
+<span class="font-body-md text-body-md font-semibold">New App</span>
+</button>
+<ul class="flex flex-col gap-sm flex-1">
+<li>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg font-label-caps text-label-caps uppercase tracking-wider" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+</li>
+<li>
+<!-- Active State Logic: Page is "Create Project", aligns with Projects tab intent -->
+<a class="flex items-center gap-md bg-secondary-container text-on-secondary-container rounded-lg px-md py-sm hover:bg-surface-container-high transition-all font-label-caps text-label-caps uppercase tracking-wider scale-95 duration-150 opacity-100" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">folder_open</span>
+                    Projects
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg font-label-caps text-label-caps uppercase tracking-wider" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg font-label-caps text-label-caps uppercase tracking-wider" href="#">
+<span class="material-symbols-outlined">hub</span>
+                    Providers
+                </a>
+</li>
+</ul>
+<div class="mt-auto px-md pt-lg border-t border-surface-container-lowest flex items-center gap-md">
+<div class="w-8 h-8 rounded-full bg-surface-variant overflow-hidden shrink-0">
+<img alt="Project Avatar" class="w-full h-full object-cover" data-alt="A macro photography shot of a sleek, dark metallic sphere with glowing circuit-like lines etched into its surface, resting on a matte black table in a dimly lit studio. The lighting highlights the metallic texture and the bright neon blue glow of the circuits. Mood is futuristic and mysterious." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBicBvZu3C1QT6LBmHsORBcfYbtsi9PywMEtuFew2NUqoGBTAmjYJNDONg0N2lDi7eAqHiLvhPiZzoJMwgc-8ti7fYEWGB7n7BSEyRPu78_OrEfrUlTywkN89eiC38vrB9aXOQAMWiSpP8zxyIOc0EoqbVjCP1vmq-dxua11ounbo5_BmVhzN4EunSJkUz6kyi4GlMIJFUAE_8iqaRprv89ScmNHjRRFcb_mMCDtRDrMc7ZFH4HBVpi"/>
+</div>
+<div class="min-w-0">
+<p class="font-body-sm text-body-sm text-on-surface truncate">ABS User</p>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col h-full bg-[#0A0A0A] overflow-y-auto relative">
+<!-- TopNavBar (Mobile Only / Responsive Fallback) -->
+<header class="md:hidden sticky top-0 z-50 w-full bg-surface/80 backdrop-blur-md px-lg py-md flex justify-between items-center border-b border-outline-variant/20">
+<div class="font-headline-md text-headline-md font-bold text-on-surface">ABS</div>
+<button class="text-primary font-body-md text-body-md bg-surface-container-high px-sm py-xs rounded">Start Building</button>
+</header>
+<main class="flex-1 w-full max-w-[960px] mx-auto px-md py-xl md:py-24 flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
+<div class="w-full max-w-3xl space-y-xl">
+<!-- Header -->
+<div class="text-center space-y-sm">
+<h2 class="font-display-lg text-display-lg text-on-surface tracking-tight">What are we building today?</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-xl mx-auto">Describe your vision. ABS will scaffold the architecture, connect providers, and generate the foundation.</p>
+</div>
+<!-- Main Prompt Editor Area (Level 1 Surface) -->
+<div class="bg-[#161616] border border-surface-container-highest rounded-xl p-md focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all duration-200">
+<textarea class="w-full h-32 bg-transparent text-on-surface font-body-md text-body-md resize-none outline-none placeholder:text-on-surface-variant/50 p-sm" placeholder="Build a high-performance analytics dashboard for tracking SaaS metrics. It needs real-time charts, user authentication, and a dark mode UI. Use sample data to populate the initial views."></textarea>
+<div class="flex items-center justify-between mt-sm border-t border-surface-container-highest pt-sm px-sm">
+<div class="flex items-center gap-sm">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded" title="Attach context">
+<span class="material-symbols-outlined text-[20px]">attach_file</span>
+</button>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded" title="Use Voice">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+</div>
+<div class="font-code-md text-code-md text-on-surface-variant/50">
+                            0 / 2000
+                        </div>
+</div>
+</div>
+<!-- Example Prompts (Chips) -->
+<div class="flex flex-wrap items-center justify-center gap-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant mr-xs">Try:</span>
+<button class="px-md py-xs rounded-full bg-surface-container-low border border-surface-container-highest text-on-surface hover:bg-surface-container transition-colors font-body-sm text-body-sm">CRM for real estate</button>
+<button class="px-md py-xs rounded-full bg-surface-container-low border border-surface-container-highest text-on-surface hover:bg-surface-container transition-colors font-body-sm text-body-sm">NFT Marketplace</button>
+<button class="px-md py-xs rounded-full bg-surface-container-low border border-surface-container-highest text-on-surface hover:bg-surface-container transition-colors font-body-sm text-body-sm">Internal HR Tool</button>
+</div>
+<!-- Configuration Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md mt-xl">
+<!-- Project Name -->
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider pl-xs block">Project Name</label>
+<input class="w-full bg-[#0A0A0A] border border-surface-container-highest rounded text-on-surface font-body-md text-body-md px-md py-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" placeholder="e.g., Nexus Dashboard" type="text"/>
+</div>
+<!-- Framework -->
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider pl-xs block">Framework</label>
+<div class="relative">
+<select class="w-full bg-[#0A0A0A] border border-surface-container-highest rounded text-on-surface font-body-md text-body-md px-md py-sm appearance-none outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+<option>Next.js</option>
+<option>Vue / Nuxt</option>
+<option>SvelteKit</option>
+</select>
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+<!-- AI Provider -->
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider pl-xs block">AI Provider</label>
+<div class="relative">
+<select class="w-full bg-[#0A0A0A] border border-surface-container-highest rounded text-on-surface font-body-md text-body-md pl-10 pr-md py-sm appearance-none outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer">
+<option>OpenAI (GPT-4o)</option>
+<option>Anthropic (Claude 3.5)</option>
+<option>Google (Gemini 1.5)</option>
+</select>
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none text-[18px]">smart_toy</span>
+<span class="material-symbols-outlined absolute right-md top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none">expand_more</span>
+</div>
+</div>
+</div>
+<!-- Advanced Settings Toggle -->
+<div class="mt-lg border border-surface-container-highest rounded-lg bg-[#161616] overflow-hidden">
+<button class="w-full flex items-center justify-between p-md text-on-surface hover:bg-surface-container-low transition-colors" onclick="document.getElementById('advanced-settings').classList.toggle('hidden')">
+<span class="font-body-md text-body-md font-semibold flex items-center gap-sm">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+                            Advanced Architecture
+                        </span>
+<span class="material-symbols-outlined text-on-surface-variant">expand_more</span>
+</button>
+<div class="hidden p-md border-t border-surface-container-highest bg-[#161616]/50 space-y-md" id="advanced-settings">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-md">
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant block pl-xs">Database Type</label>
+<select class="w-full bg-[#0A0A0A] border border-surface-container-highest rounded text-on-surface font-body-sm text-body-sm px-sm py-xs outline-none focus:border-primary">
+<option>PostgreSQL (Supabase)</option>
+<option>MongoDB</option>
+<option>SQLite</option>
+</select>
+</div>
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant block pl-xs">Auth Provider</label>
+<select class="w-full bg-[#0A0A0A] border border-surface-container-highest rounded text-on-surface font-body-sm text-body-sm px-sm py-xs outline-none focus:border-primary">
+<option>NextAuth / Auth.js</option>
+<option>Clerk</option>
+<option>Supabase Auth</option>
+</select>
+</div>
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant block pl-xs">API Structure</label>
+<select class="w-full bg-[#0A0A0A] border border-surface-container-highest rounded text-on-surface font-body-sm text-body-sm px-sm py-xs outline-none focus:border-primary">
+<option>REST (App Router)</option>
+<option>tRPC</option>
+<option>GraphQL</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+<!-- Primary Action -->
+<div class="pt-xl flex justify-center">
+<button class="bg-primary-container text-white py-md px-xl rounded-lg flex justify-center items-center gap-sm border-t border-white/10 shadow-lg shadow-primary-container/20 transition-all hover:-translate-y-0.5 hover:shadow-primary-container/40">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-headline-sm text-headline-sm tracking-wide">Generate Project</span>
+</button>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="w-full bg-surface-container-lowest py-xl px-lg flex flex-col md:flex-row justify-between items-center max-w-container-max mx-auto border-t border-outline-variant/10 mt-auto shrink-0">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-md md:mb-0">
+                © 2024 AI Builder Studio. Built for high-performance deep work.
+            </div>
+<nav class="flex gap-md">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors duration-200" href="#">Sitemap</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors duration-200" href="#">Terms of Service</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors duration-200" href="#">Privacy Policy</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors duration-200" href="#">System Status</a>
+</nav>
+</footer>
+</div>
+</body></html>

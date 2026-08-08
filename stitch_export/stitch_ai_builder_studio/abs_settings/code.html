@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Settings - ABS Workspace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary": "#003824",
+                    "outline-variant": "#464555",
+                    "on-error": "#690005",
+                    "surface-container-lowest": "#0e0e0e",
+                    "error-container": "#93000a",
+                    "tertiary-container": "#006e4b",
+                    "inverse-on-surface": "#313030",
+                    "tertiary-fixed-dim": "#4edea3",
+                    "inverse-surface": "#e5e2e1",
+                    "on-primary-fixed": "#0f0069",
+                    "on-error-container": "#ffdad6",
+                    "surface-container": "#201f1f",
+                    "secondary-container": "#00a2e6",
+                    "secondary-fixed": "#c9e6ff",
+                    "on-secondary-container": "#00344e",
+                    "on-tertiary-fixed": "#002113",
+                    "surface-dim": "#131313",
+                    "surface-tint": "#c3c0ff",
+                    "inverse-primary": "#4d44e3",
+                    "surface-container-low": "#1c1b1b",
+                    "on-tertiary-container": "#67f4b7",
+                    "secondary-fixed-dim": "#89ceff",
+                    "secondary": "#89ceff",
+                    "on-surface-variant": "#c7c4d8",
+                    "outline": "#918fa1",
+                    "on-secondary-fixed-variant": "#004c6e",
+                    "primary-fixed-dim": "#c3c0ff",
+                    "surface-bright": "#393939",
+                    "on-tertiary-fixed-variant": "#005236",
+                    "surface-variant": "#353534",
+                    "surface-container-high": "#2a2a2a",
+                    "primary": "#c3c0ff",
+                    "surface-container-highest": "#353534",
+                    "on-primary-container": "#dad7ff",
+                    "surface": "#131313",
+                    "on-background": "#e5e2e1",
+                    "on-primary-fixed-variant": "#3323cc",
+                    "error": "#ffb4ab",
+                    "background": "#131313",
+                    "on-surface": "#e5e2e1",
+                    "on-primary": "#1d00a5",
+                    "on-secondary": "#00344d",
+                    "primary-container": "#4f46e5",
+                    "tertiary": "#4edea3",
+                    "on-secondary-fixed": "#001e2f",
+                    "primary-fixed": "#e2dfff",
+                    "tertiary-fixed": "#6ffbbe"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "container-max": "1440px",
+                    "xl": "32px",
+                    "md": "16px",
+                    "gutter": "16px",
+                    "lg": "24px",
+                    "base": "8px",
+                    "sm": "8px",
+                    "xs": "4px"
+            },
+            "fontFamily": {
+                    "headline-sm": [
+                            "Geist"
+                    ],
+                    "display-lg": [
+                            "Geist"
+                    ],
+                    "code-md": [
+                            "JetBrains Mono"
+                    ],
+                    "body-md": [
+                            "Geist"
+                    ],
+                    "body-sm": [
+                            "Geist"
+                    ],
+                    "headline-md": [
+                            "Geist"
+                    ],
+                    "label-caps": [
+                            "Geist"
+                    ]
+            },
+            "fontSize": {
+                    "headline-sm": [
+                            "18px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "display-lg": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "code-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-md": [
+                            "15px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "body-sm": [
+                            "13px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #0A0A0A;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col antialiased overflow-x-hidden selection:bg-primary-container selection:text-white">
+<!-- TopNavBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-lg py-md bg-surface/80 dark:bg-surface/80 backdrop-blur-md border-b border-outline-variant/20">
+<div class="flex items-center gap-xl">
+<div class="font-headline-md text-headline-md font-bold text-on-surface dark:text-on-surface tracking-tight">ABS</div>
+<!-- Desktop Nav Links -->
+<nav class="hidden md:flex items-center gap-lg">
+<a class="font-body-md text-body-md text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Dashboard</a>
+<a class="font-body-md text-body-md text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Projects</a>
+<a class="font-body-md text-body-md text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-colors py-1" href="#">Templates</a>
+<a class="font-body-md text-body-md text-on-surface-variant dark:text-on-surface-variant hover:text-primary transition-colors py-1" href="#">AI Providers</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<!-- Search -->
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-sm top-1/2 -translate-y-1/2 text-outline text-sm">search</span>
+<input class="bg-surface-container border border-surface-container-high rounded-DEFAULT pl-8 pr-md py-sm text-body-sm font-body-sm text-on-surface focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20 transition-all w-48 focus:w-64" placeholder="Search..." type="text"/>
+</div>
+<button class="bg-primary-container text-white px-md py-sm rounded-DEFAULT font-label-caps text-label-caps hover:bg-primary-container/90 transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+                Start Building
+            </button>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-surface-container-high cursor-pointer hover:opacity-80 transition-opacity" data-alt="A small circular avatar image showing a highly detailed, futuristic glowing geometric icon in deep indigo and neon cyan hues on a dark charcoal background. Clean, high-tech, minimal lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB979jvGU7ywYsI9_4R7FT8OJrE7zhd0Q6J44ppaF4p406zuuVLpGZOpxn-Qm_ymJlg9KlS2BbLuhuYuyv5VZbBibFUbvLwtyQFl3Zo7VaXEqOloLLIGQb5BMOJ6v12eWb1SVTLLDWEAYZhYeNC5_NaRw-IsIczROxbnrbDwMOTdE7vF_MrkFMx3j0IfkvxYjKiVeSkOIJlojiynFdyIrBT_lLsg6JzB8GHscycW5lVZ8LwKm0NEuq6"/>
+</div>
+</header>
+<div class="flex flex-1 pt-[72px]">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col fixed left-0 top-[72px] h-[calc(100vh-72px)] w-64 bg-surface-container dark:bg-surface-container bg-surface-container-low p-md border-r border-outline-variant/10 z-40">
+<div class="mb-xl px-sm">
+<div class="flex items-center gap-md mb-xs">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-high flex items-center justify-center border border-outline-variant/20">
+<span class="material-symbols-outlined text-primary">workspaces</span>
+</div>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Project Workspace</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">v1.0.4-alpha</p>
+</div>
+</div>
+</div>
+<nav class="flex-1 flex flex-col gap-sm">
+<a class="font-label-caps text-label-caps flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+                    Dashboard
+                </a>
+<a class="font-label-caps text-label-caps flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">folder_open</span>
+                    Projects
+                </a>
+<a class="font-label-caps text-label-caps flex items-center gap-md bg-secondary-container text-on-secondary-container rounded-lg px-md py-sm scale-95 duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+                    Settings
+                </a>
+<a class="font-label-caps text-label-caps flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">hub</span>
+                    Providers
+                </a>
+</nav>
+<div class="mt-auto pt-lg">
+<button class="w-full flex items-center justify-center gap-sm bg-transparent border border-outline-variant text-on-surface font-label-caps text-label-caps py-sm px-md rounded-DEFAULT hover:bg-surface-container-high hover:border-outline transition-all">
+<span class="material-symbols-outlined text-sm">add</span>
+                    New App
+                </button>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 p-lg md:p-xl max-w-container-max mx-auto w-full pb-32">
+<div class="mb-xl">
+<h1 class="font-headline-md text-headline-md text-on-surface mb-sm">Settings</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Manage your workspace configuration and preferences.</p>
+</div>
+<!-- Bento Grid Layout for Settings -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-lg">
+<!-- Navigation Tabs (Left Sidebar in Desktop, Horizontal in Mobile) -->
+<div class="xl:col-span-3">
+<div class="bg-surface bg-surface/50 backdrop-blur-md rounded-xl border border-surface-container-high p-md sticky top-24">
+<nav class="flex flex-row xl:flex-col gap-xs overflow-x-auto xl:overflow-visible pb-sm xl:pb-0 hide-scrollbar">
+<button class="flex-shrink-0 text-left px-md py-sm rounded-DEFAULT bg-surface-container-high text-primary font-body-sm text-body-sm border border-primary/20 flex items-center gap-sm transition-colors">
+<span class="material-symbols-outlined text-[18px]">person</span>
+                                Account
+                            </button>
+<button class="flex-shrink-0 text-left px-md py-sm rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low font-body-sm text-body-sm flex items-center gap-sm transition-colors">
+<span class="material-symbols-outlined text-[18px]">palette</span>
+                                Appearance
+                            </button>
+<button class="flex-shrink-0 text-left px-md py-sm rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low font-body-sm text-body-sm flex items-center gap-sm transition-colors">
+<span class="material-symbols-outlined text-[18px]">smart_toy</span>
+                                AI Preferences
+                            </button>
+<button class="flex-shrink-0 text-left px-md py-sm rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low font-body-sm text-body-sm flex items-center gap-sm transition-colors">
+<span class="material-symbols-outlined text-[18px]">rocket_launch</span>
+                                Deployment
+                            </button>
+<button class="flex-shrink-0 text-left px-md py-sm rounded-DEFAULT text-on-surface-variant hover:bg-surface-container-low font-body-sm text-body-sm flex items-center gap-sm transition-colors">
+<span class="material-symbols-outlined text-[18px]">credit_card</span>
+                                Billing
+                            </button>
+</nav>
+</div>
+</div>
+<!-- Active Tab Content Area -->
+<div class="xl:col-span-9 flex flex-col gap-lg">
+<!-- Account Section -->
+<section class="bg-[#161616] rounded-xl border border-[#262626] p-lg md:p-xl relative overflow-hidden group">
+<div class="absolute top-0 right-0 w-64 h-64 bg-primary-container/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none group-hover:bg-primary-container/10 transition-colors duration-700"></div>
+<div class="relative z-10">
+<h3 class="font-headline-sm text-headline-sm text-on-surface mb-lg flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary text-xl">account_circle</span>
+                                Profile Information
+                            </h3>
+<div class="flex flex-col md:flex-row gap-xl items-start">
+<div class="flex flex-col items-center gap-md">
+<div class="relative group cursor-pointer">
+<img alt="User Avatar" class="w-24 h-24 rounded-full object-cover border-2 border-surface-container-high group-hover:border-primary transition-colors" data-alt="A highly detailed, professional headshot avatar of a developer in a dark, moody tech environment. Soft rim lighting with cool cyan and warm amber accents. High resolution, sleek." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBsHH6ME4e4tWlMaUAjfin-280A4VldzShrsYM2wrTWqxR94kv2f0qcQsCOQxmI6x9Qm5xzwAYbPK4fc-w7q0YcQ9wXJ0zU9czC5-y1v0WKORcZPNVfWtvcG7ccy82uqfoKGFGAiDB-j5eLHIsZrnx72lJ37ab-Ro8HJwAGLK8p_CL2dPiCJn84S5ikOS0-8PSlF8ntRBO-IaoNv2IA1_Ip2-sgHPcl1TpPncCuG_KigmnkoUpIhUiN"/>
+<div class="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
+<span class="material-symbols-outlined text-white">photo_camera</span>
+</div>
+</div>
+<button class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors">Change Photo</button>
+</div>
+<div class="flex-1 w-full space-y-md">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant block">Full Name</label>
+<input class="w-full bg-[#0A0A0A] border border-[#262626] rounded-DEFAULT px-md py-sm text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-[2px] focus:ring-primary/20 transition-all" type="text" value="Alex Developer"/>
+</div>
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant block">Display Name</label>
+<input class="w-full bg-[#0A0A0A] border border-[#262626] rounded-DEFAULT px-md py-sm text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-[2px] focus:ring-primary/20 transition-all" type="text" value="alex_dev"/>
+</div>
+</div>
+<div class="space-y-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant block">Email Address</label>
+<input class="w-full bg-[#0A0A0A] border border-[#262626] rounded-DEFAULT px-md py-sm text-body-md font-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-[2px] focus:ring-primary/20 transition-all text-on-surface-variant" readonly="" type="email" value="alex@example.com"/>
+<p class="font-body-sm text-body-sm text-outline-variant mt-1">Email changes require verification.</p>
+</div>
+<div class="pt-md flex justify-end">
+<button class="bg-primary-container text-white px-lg py-sm rounded-DEFAULT font-label-caps text-label-caps hover:bg-primary-container/90 transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+                                            Save Changes
+                                        </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer -->
+<footer class="mt-auto w-full py-xl px-lg flex flex-col md:flex-row justify-between items-center max-w-container-max mx-auto bg-surface-container-lowest dark:bg-surface-container-lowest border-t border-outline-variant/10 z-10 relative">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-md md:mb-0">
+            © 2024 AI Builder Studio. Built for high-performance deep work.
+        </div>
+<nav class="flex items-center gap-lg">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-all duration-200" href="#">Sitemap</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-all duration-200" href="#">Terms of Service</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-all duration-200" href="#">Privacy Policy</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-all duration-200" href="#">System Status</a>
+</nav>
+</footer>
+<style>
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard - AI Builder Studio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface-dim": "#131313",
+                "primary-fixed-dim": "#c3c0ff",
+                "on-tertiary-fixed-variant": "#005236",
+                "primary": "#c3c0ff",
+                "on-error": "#690005",
+                "on-surface": "#e5e2e1",
+                "inverse-primary": "#4d44e3",
+                "on-secondary-fixed": "#001e2f",
+                "on-primary-container": "#dad7ff",
+                "surface-bright": "#393939",
+                "on-tertiary-container": "#67f4b7",
+                "tertiary-container": "#006e4b",
+                "surface-container-high": "#2a2a2a",
+                "on-primary-fixed": "#0f0069",
+                "error-container": "#93000a",
+                "primary-container": "#4f46e5",
+                "on-background": "#e5e2e1",
+                "tertiary-fixed-dim": "#4edea3",
+                "error": "#ffb4ab",
+                "outline-variant": "#464555",
+                "surface-variant": "#353534",
+                "on-tertiary": "#003824",
+                "tertiary": "#4edea3",
+                "inverse-on-surface": "#313030",
+                "background": "#131313",
+                "primary-fixed": "#e2dfff",
+                "on-tertiary-fixed": "#002113",
+                "on-primary-fixed-variant": "#3323cc",
+                "surface-container": "#201f1f",
+                "secondary-fixed-dim": "#89ceff",
+                "on-secondary-container": "#00344e",
+                "surface-container-highest": "#353534",
+                "surface": "#131313",
+                "surface-container-lowest": "#0e0e0e",
+                "on-surface-variant": "#c7c4d8",
+                "surface-container-low": "#1c1b1b",
+                "secondary-container": "#00a2e6",
+                "on-primary": "#1d00a5",
+                "inverse-surface": "#e5e2e1",
+                "surface-tint": "#c3c0ff",
+                "on-error-container": "#ffdad6",
+                "on-secondary": "#00344d",
+                "outline": "#918fa1",
+                "secondary-fixed": "#c9e6ff",
+                "secondary": "#89ceff",
+                "on-secondary-fixed-variant": "#004c6e",
+                "tertiary-fixed": "#6ffbbe"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.25rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+                "full": "9999px"
+        },
+        "spacing": {
+                "container-max": "1440px",
+                "xl": "32px",
+                "xs": "4px",
+                "sm": "8px",
+                "base": "8px",
+                "gutter": "16px",
+                "lg": "24px",
+                "md": "16px"
+        },
+        "fontFamily": {
+                "label-caps": [
+                        "Geist"
+                ],
+                "display-lg": [
+                        "Geist"
+                ],
+                "code-md": [
+                        "JetBrains Mono"
+                ],
+                "headline-md": [
+                        "Geist"
+                ],
+                "headline-sm": [
+                        "Geist"
+                ],
+                "body-sm": [
+                        "Geist"
+                ],
+                "body-md": [
+                        "Geist"
+                ]
+        },
+        "fontSize": {
+                "label-caps": [
+                        "11px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "display-lg": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "code-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-md": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "letterSpacing": "-0.01em",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-sm": [
+                        "18px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-sm": [
+                        "13px",
+                        {
+                                "lineHeight": "20px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-md": [
+                        "15px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { background-color: #0A0A0A; color: #e5e2e1; }
+        .glass-panel {
+            background: rgba(22, 22, 22, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        .inner-glow {
+            box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.05);
+        }
+        .card-border {
+            border: 1px solid #262626;
+        }
+        .card-border:hover {
+            border-color: #404040;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden font-body-md text-body-md bg-surface-container-lowest">
+<!-- TopNavBar for Mobile -->
+<nav class="md:hidden fixed top-0 w-full z-50 flex justify-between items-center px-lg py-md bg-surface/80 backdrop-blur-md border-b border-outline-variant/20">
+<div class="font-headline-md text-headline-md font-bold text-on-surface">ABS</div>
+<button class="bg-primary-container text-on-primary-container px-4 py-2 rounded-lg font-label-caps text-label-caps inner-glow">Start Building</button>
+</nav>
+<!-- SideNavBar (Desktop) -->
+<aside class="hidden md:flex fixed left-0 top-0 h-full w-64 flex-col p-md bg-surface-container border-r border-outline-variant/20">
+<div class="mb-xl">
+<div class="flex items-center gap-md">
+<img class="w-10 h-10 rounded-lg object-cover" data-alt="A sleek, minimalist project avatar icon featuring abstract geometric shapes in deep charcoal and neon indigo, rendered in a crisp vector style on a dark background. High contrast, professional UI asset." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAtyLvandCtzcmbTLPO1CTIraJn0_wRT6U65O5T2YXrt-heOcXcgKIHOQrqwTXIGIH2lDiV0hOTmL5u0-Eu49oeqehSyHMtlvy-wncWVy94Zdqor7VXswFOhtFrZ7mRbONz463k01oJn8S1PTMi-Q_fIQxrQaCijPFUwSx12M4vlclyBGQqD-DMP9-zZ7gYveM8yokOqcHLfkG9S_yOb0DUA_TCQEyBg5wB9QWXRn4glPn-zS41AEDM"/>
+<div>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Project Workspace</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">v1.0.4-alpha</p>
+</div>
+</div>
+</div>
+<button class="mb-lg w-full py-2 bg-primary-container text-on-primary-container rounded-lg font-label-caps text-label-caps inner-glow hover:opacity-90 transition-opacity">
+            New App
+        </button>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center gap-md bg-secondary-container text-on-secondary-container rounded-lg px-md py-sm hover:opacity-80 transition-opacity" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-label-caps">Dashboard</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span class="font-label-caps text-label-caps">Projects</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all rounded-lg" href="#">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+<span class="font-label-caps text-label-caps">Providers</span>
+</a>
+</nav>
+<div class="mt-auto pt-md border-t border-outline-variant/20">
+<div class="flex items-center justify-between">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Profile</span>
+<img class="w-8 h-8 rounded-full border border-outline-variant/50" data-alt="A professional headshot of a software developer in a dimly lit studio setting, illuminated by soft blue and white rim lights, dark background, sharp focus, modern tech aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCno_MJBTb5WPVSkyX3zPWrCvSA_6uOBWqq_bctjyc3oFwWt29b3IMnYC-AUTLex36pE-n6jqBzlJ3WsSR3xnrZ9RI5DXpd7XUaKfnEI5OujwWvsbGryfE65rQJLgV_G1rh_00t4ADyuAhgMuBJucwWSJeeqLwGhVCn-y65gw7fhxgFrN7Z6MXKWkvZPyOLhENUsjTxG-EqDh-MZTrIhipVVF-V6KEHFrcpQfvtJs2AAjt0IPEEC9GP"/>
+</div>
+</div>
+</aside>
+<!-- Main Content Canvas -->
+<main class="flex-1 ml-0 md:ml-64 mt-[72px] md:mt-0 p-lg md:p-xl overflow-y-auto h-full">
+<!-- Header -->
+<header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-lg gap-4">
+<div>
+<h1 class="font-headline-md text-headline-md text-on-surface">Welcome back, Developer</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">Here's what's happening with your projects today.</p>
+</div>
+<button class="bg-primary-container text-white px-6 py-2.5 rounded-lg font-label-caps text-label-caps inner-glow hover:opacity-90 transition-opacity shadow-[0_0_15px_rgba(79,70,229,0.2)]">
+                Create New Project
+            </button>
+</header>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-md">
+<!-- Left Column: Projects (Takes up 2 columns on lg) -->
+<div class="lg:col-span-2 space-y-sm">
+<h2 class="font-headline-sm text-headline-sm text-on-surface mb-sm">Recent Projects</h2>
+<!-- Project Card 1 -->
+<div class="bg-[#161616] card-border rounded-lg p-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 transition-all hover:bg-surface-container-high cursor-pointer group">
+<div class="flex items-center gap-md w-full md:w-auto">
+<div class="w-10 h-10 rounded bg-surface-container flex items-center justify-center border border-outline-variant/30 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">code_blocks</span>
+</div>
+<div>
+<div class="flex items-center gap-sm">
+<h3 class="font-headline-sm text-body-md font-semibold text-on-surface group-hover:text-primary transition-colors">E-commerce App</h3>
+<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary-container/20 text-primary uppercase tracking-wider flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></span>Live</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-3 mt-0.5">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">smart_toy</span> OpenAI GPT-4</span>
+</div>
+</div>
+</div>
+<div class="text-left md:text-right w-full md:w-auto flex justify-between md:block items-center">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Last deployed</p>
+<p class="font-code-md text-code-md text-on-surface text-sm">2 hours ago</p>
+</div>
+</div>
+<!-- Project Card 2 -->
+<div class="bg-[#161616] card-border rounded-lg p-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 transition-all hover:bg-surface-container-high cursor-pointer group">
+<div class="flex items-center gap-md w-full md:w-auto">
+<div class="w-10 h-10 rounded bg-surface-container flex items-center justify-center border border-outline-variant/30 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">dataset</span>
+</div>
+<div>
+<div class="flex items-center gap-sm">
+<h3 class="font-headline-sm text-body-md font-semibold text-on-surface group-hover:text-secondary transition-colors">SaaS Boilerplate</h3>
+<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-secondary-container/20 text-secondary uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[10px]">build</span>Building</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-3 mt-0.5">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">smart_toy</span> Gemini 1.5 Pro</span>
+</div>
+</div>
+</div>
+<div class="text-left md:text-right w-full md:w-auto flex justify-between md:block items-center">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Last active</p>
+<p class="font-code-md text-code-md text-on-surface text-sm">1 day ago</p>
+</div>
+</div>
+<!-- Project Card 3 -->
+<div class="bg-[#161616] card-border rounded-lg p-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3 transition-all hover:bg-surface-container-high cursor-pointer group">
+<div class="flex items-center gap-md w-full md:w-auto">
+<div class="w-10 h-10 rounded bg-surface-container flex items-center justify-center border border-outline-variant/30 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]">web</span>
+</div>
+<div>
+<div class="flex items-center gap-sm">
+<h3 class="font-headline-sm text-body-md font-semibold text-on-surface group-hover:text-tertiary transition-colors">Marketing Site</h3>
+<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary-container/20 text-primary uppercase tracking-wider flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-primary"></span>Live</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-3 mt-0.5">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">smart_toy</span> Claude 3 Opus</span>
+</div>
+</div>
+</div>
+<div class="text-left md:text-right w-full md:w-auto flex justify-between md:block items-center">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Last deployed</p>
+<p class="font-code-md text-code-md text-on-surface text-sm">3 days ago</p>
+</div>
+</div>
+</div>
+<!-- Right Column: Stats & Actions -->
+<div class="space-y-md">
+<!-- Current Provider -->
+<div class="bg-[#161616] card-border rounded-lg p-sm flex items-center justify-between border-l-2 border-l-primary">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[18px]">memory</span>
+</div>
+<div>
+<p class="font-label-caps text-[10px] text-on-surface-variant uppercase">Active Model</p>
+<p class="font-body-md font-semibold text-on-surface leading-tight">Gemini 1.5 Pro</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] cursor-pointer hover:text-on-surface">settings</span>
+</div>
+<!-- Usage Stats -->
+<div class="bg-[#161616] card-border rounded-lg p-md">
+<div class="flex justify-between items-center mb-md">
+<h2 class="font-headline-sm text-body-md font-semibold text-on-surface">Telemetry</h2>
+<span class="text-[10px] font-code-md text-on-surface-variant">Cycle: Oct 2023</span>
+</div>
+<div class="space-y-4">
+<!-- Tokens -->
+<div>
+<div class="flex justify-between text-body-sm text-on-surface-variant mb-1">
+<span class="flex items-center gap-1 text-[12px]"><span class="material-symbols-outlined text-[14px]">token</span> Token Usage</span>
+<span class="font-code-md text-on-surface text-[12px]">845k / 1M</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1">
+<div class="bg-primary h-1 rounded-full" style="width: 84%"></div>
+</div>
+</div>
+<!-- Projects -->
+<div>
+<div class="flex justify-between text-body-sm text-on-surface-variant mb-1">
+<span class="flex items-center gap-1 text-[12px]"><span class="material-symbols-outlined text-[14px]">apps</span> Active Projects</span>
+<span class="font-code-md text-on-surface text-[12px]">3 / 10</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1">
+<div class="bg-secondary h-1 rounded-full" style="width: 30%"></div>
+</div>
+</div>
+<!-- Credits -->
+<div>
+<div class="flex justify-between text-body-sm text-on-surface-variant mb-1">
+<span class="flex items-center gap-1 text-[12px]"><span class="material-symbols-outlined text-[14px]">cloud_upload</span> Deploy Credits</span>
+<span class="font-code-md text-on-surface text-[12px]">12 / 50</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1">
+<div class="bg-tertiary h-1 rounded-full" style="width: 24%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Quick Actions -->
+<div class="grid grid-cols-3 gap-sm">
+<button class="bg-[#161616] card-border rounded-lg p-2 flex flex-col items-center justify-center gap-1 hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]" data-icon="menu_book">menu_book</span>
+<span class="font-label-caps text-[9px] text-on-surface text-center leading-tight">View<br/>Docs</span>
+</button>
+<button class="bg-[#161616] card-border rounded-lg p-2 flex flex-col items-center justify-center gap-1 hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]" data-icon="dashboard_customize">dashboard_customize</span>
+<span class="font-label-caps text-[9px] text-on-surface text-center leading-tight">Community<br/>Templates</span>
+</button>
+<button class="bg-[#161616] card-border rounded-lg p-2 flex flex-col items-center justify-center gap-1 hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]" data-icon="api">api</span>
+<span class="font-label-caps text-[9px] text-on-surface text-center leading-tight">API<br/>Settings</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar for Mobile -->
+<nav class="md:hidden fixed bottom-0 w-full bg-surface-container-low border-t border-outline-variant/10 flex justify-around p-sm z-50">
+<a class="flex flex-col items-center p-2 text-primary" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-[9px] mt-1">Dashboard</span>
+</a>
+<a class="flex flex-col items-center p-2 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined" data-icon="folder_open">folder_open</span>
+<span class="font-label-caps text-[9px] mt-1">Projects</span>
+</a>
+<a class="flex flex-col items-center p-2 text-on-surface-variant" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-caps text-[9px] mt-1">Settings</span>
+</a>
+</nav>
+</body></html>

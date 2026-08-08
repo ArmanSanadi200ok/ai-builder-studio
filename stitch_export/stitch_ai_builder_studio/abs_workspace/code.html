@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI Generation Workspace</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&amp;family=JetBrains+Mono:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary": "#003824",
+                      "outline-variant": "#464555",
+                      "on-error": "#690005",
+                      "surface-container-lowest": "#0e0e0e",
+                      "error-container": "#93000a",
+                      "tertiary-container": "#006e4b",
+                      "inverse-on-surface": "#313030",
+                      "tertiary-fixed-dim": "#4edea3",
+                      "inverse-surface": "#e5e2e1",
+                      "on-primary-fixed": "#0f0069",
+                      "on-error-container": "#ffdad6",
+                      "surface-container": "#201f1f",
+                      "secondary-container": "#00a2e6",
+                      "secondary-fixed": "#c9e6ff",
+                      "on-secondary-container": "#00344e",
+                      "on-tertiary-fixed": "#002113",
+                      "surface-dim": "#131313",
+                      "surface-tint": "#c3c0ff",
+                      "inverse-primary": "#4d44e3",
+                      "surface-container-low": "#1c1b1b",
+                      "on-tertiary-container": "#67f4b7",
+                      "secondary-fixed-dim": "#89ceff",
+                      "secondary": "#89ceff",
+                      "on-surface-variant": "#c7c4d8",
+                      "outline": "#918fa1",
+                      "on-secondary-fixed-variant": "#004c6e",
+                      "primary-fixed-dim": "#c3c0ff",
+                      "surface-bright": "#393939",
+                      "on-tertiary-fixed-variant": "#005236",
+                      "surface-variant": "#353534",
+                      "surface-container-high": "#2a2a2a",
+                      "primary": "#c3c0ff",
+                      "surface-container-highest": "#353534",
+                      "on-primary-container": "#dad7ff",
+                      "surface": "#131313",
+                      "on-background": "#e5e2e1",
+                      "on-primary-fixed-variant": "#3323cc",
+                      "error": "#ffb4ab",
+                      "background": "#131313",
+                      "on-surface": "#e5e2e1",
+                      "on-primary": "#1d00a5",
+                      "on-secondary": "#00344d",
+                      "primary-container": "#4f46e5",
+                      "tertiary": "#4edea3",
+                      "on-secondary-fixed": "#001e2f",
+                      "primary-fixed": "#e2dfff",
+                      "tertiary-fixed": "#6ffbbe"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container-max": "1440px",
+                      "xl": "32px",
+                      "md": "16px",
+                      "gutter": "16px",
+                      "lg": "24px",
+                      "base": "8px",
+                      "sm": "8px",
+                      "xs": "4px"
+              },
+              "fontFamily": {
+                      "headline-sm": ["Geist"],
+                      "display-lg": ["Geist"],
+                      "code-md": ["JetBrains Mono"],
+                      "body-md": ["Geist"],
+                      "body-sm": ["Geist"],
+                      "headline-md": ["Geist"],
+                      "label-caps": ["Geist"]
+              },
+              "fontSize": {
+                      "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                      "code-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "body-md": ["15px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "body-sm": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                      "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        /* Custom scrollbar for a sleek dark mode look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #353534; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #464555; 
+        }
+        
+        .glass-panel {
+            background: rgba(28, 27, 27, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+        
+        /* Shimmer effect for active code generation */
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        .animate-shimmer {
+            animation: shimmer 2s infinite linear;
+            background: linear-gradient(to right, #2a2a2a 4%, #353534 25%, #2a2a2a 36%);
+            background-size: 1000px 100%;
+        }
+        
+        .btn-primary-inner-glow {
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md h-screen flex flex-col overflow-hidden selection:bg-primary-container selection:text-white">
+<!-- Workspace Header (Task-Focused, replaces global nav) -->
+<header class="h-16 flex items-center justify-between px-md border-b border-outline-variant/20 bg-surface shrink-0 z-20">
+<div class="flex items-center gap-md">
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div class="h-5 w-[1px] bg-outline-variant/30"></div>
+<div>
+<h1 class="font-headline-sm text-headline-sm text-on-surface">Analytics Dashboard v2</h1>
+<div class="flex items-center gap-xs mt-0.5">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-tertiary"></span>
+</span>
+<span class="font-label-caps text-label-caps text-tertiary tracking-wider uppercase">Live Generation</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-sm">
+<button class="flex items-center gap-xs px-sm py-1.5 rounded bg-surface-container border border-outline-variant/30 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="refresh">refresh</span>
+                Regenerate
+            </button>
+<button class="flex items-center gap-xs px-sm py-1.5 rounded bg-error-container/20 border border-error/30 text-error hover:bg-error-container/40 transition-colors font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="stop_circle">stop_circle</span>
+                Stop
+            </button>
+<button class="ml-sm flex items-center gap-xs px-md py-1.5 rounded bg-primary-container text-white btn-primary-inner-glow hover:bg-inverse-primary transition-colors font-body-sm text-body-sm font-semibold">
+<span class="material-symbols-outlined text-[16px]" data-icon="publish">publish</span>
+                Deploy
+            </button>
+</div>
+</header>
+<!-- Main 3-Panel Workspace -->
+<main class="flex-1 flex overflow-hidden">
+<!-- LEFT PANEL: AI Conversation & Pipeline -->
+<aside class="w-[340px] flex flex-col border-r border-outline-variant/20 bg-surface-container-lowest shrink-0 z-10">
+<!-- Pipeline Tracker -->
+<div class="p-md border-b border-outline-variant/20 bg-surface-container-low/50">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant mb-sm uppercase tracking-widest">Generation Pipeline</h2>
+<ul class="flex flex-col gap-sm">
+<li class="flex items-center gap-sm text-on-surface font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px] text-tertiary" data-icon="check_circle" data-weight="fill">check_circle</span>
+                        Planning &amp; Architecture
+                    </li>
+<li class="flex items-center gap-sm text-on-surface font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px] text-tertiary" data-icon="check_circle" data-weight="fill">check_circle</span>
+                        UI Component Generation
+                    </li>
+<li class="flex items-center gap-sm text-primary font-body-sm text-body-sm font-semibold">
+<span class="material-symbols-outlined text-[16px] animate-spin" data-icon="progress_activity">progress_activity</span>
+                        Wiring Data Logic
+                    </li>
+<li class="flex items-center gap-sm text-on-surface-variant font-body-sm text-body-sm opacity-50">
+<span class="material-symbols-outlined text-[16px]" data-icon="radio_button_unchecked">radio_button_unchecked</span>
+                        Security Validation
+                    </li>
+</ul>
+</div>
+<!-- Chat Area -->
+<div class="flex-1 overflow-y-auto p-md flex flex-col gap-lg">
+<!-- User Prompt -->
+<div class="flex flex-col items-end gap-1">
+<div class="bg-surface-container-highest px-md py-sm rounded-lg rounded-tr-none text-on-surface max-w-[90%] font-body-sm text-body-sm border border-outline-variant/10 shadow-sm">
+                        Build a dark-themed analytics dashboard with a revenue chart and a list of recent transactions. Make it look like a high-end fintech app.
+                    </div>
+<span class="font-label-caps text-[9px] text-on-surface-variant">10:42 AM</span>
+</div>
+<!-- AI Response -->
+<div class="flex flex-col items-start gap-1">
+<div class="flex items-center gap-sm mb-1">
+<div class="w-6 h-6 rounded bg-primary-container flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-[14px]" data-icon="smart_toy">smart_toy</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">ABS Builder AI</span>
+</div>
+<div class="bg-surface-container px-md py-sm rounded-lg rounded-tl-none text-on-surface-variant max-w-[95%] font-body-sm text-body-sm border border-outline-variant/10">
+                        I'm setting up the grid layout now. I've selected a charting library and I'm currently writing the <code class="font-code-md text-primary bg-surface-container-highest px-1 rounded">DashboardCanvas.tsx</code> component to wire up the mock data.
+                    </div>
+</div>
+<!-- Generating State Indicator -->
+<div class="flex flex-col items-start gap-1">
+<div class="flex items-center gap-sm mb-1">
+<div class="w-6 h-6 rounded bg-primary-container flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-[14px]" data-icon="smart_toy">smart_toy</span>
+</div>
+<span class="font-label-caps text-label-caps text-on-surface-variant">ABS Builder AI</span>
+</div>
+<div class="flex items-center gap-2 bg-surface-container px-md py-sm rounded-lg rounded-tl-none border border-outline-variant/10">
+<div class="flex gap-1">
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 0ms;"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 150ms;"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style="animation-delay: 300ms;"></div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant ml-2">Writing component logic...</span>
+</div>
+</div>
+</div>
+<!-- Chat Input -->
+<div class="p-md border-t border-outline-variant/20 bg-surface-container-low">
+<div class="relative">
+<textarea class="w-full bg-surface border border-outline-variant/30 rounded-lg pl-sm pr-10 py-sm font-body-sm text-body-sm text-on-surface placeholder:text-on-surface-variant/50 focus:ring-1 focus:ring-primary focus:border-primary resize-none h-[60px]" placeholder="Ask for changes (e.g. 'Make the chart blue')"></textarea>
+<button class="absolute bottom-2 right-2 w-7 h-7 flex items-center justify-center rounded bg-surface-container-highest text-on-surface hover:bg-primary-container hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[16px]" data-icon="send">send</span>
+</button>
+</div>
+</div>
+</aside>
+<!-- CENTER PANEL: Live Application Preview -->
+<section class="flex-1 flex flex-col bg-surface-dim relative min-w-0">
+<!-- Preview Toolbar -->
+<div class="h-12 border-b border-outline-variant/10 bg-surface-container flex items-center justify-between px-md shrink-0">
+<div class="flex items-center gap-sm">
+<span class="font-label-caps text-label-caps text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded">Preview</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">localhost:3000</span>
+</div>
+<div class="flex items-center bg-surface-container-highest rounded border border-outline-variant/20 p-0.5">
+<button class="w-8 h-6 flex items-center justify-center rounded bg-surface-container text-primary shadow-sm">
+<span class="material-symbols-outlined text-[16px]" data-icon="desktop_windows">desktop_windows</span>
+</button>
+<button class="w-8 h-6 flex items-center justify-center rounded text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]" data-icon="smartphone">smartphone</span>
+</button>
+</div>
+</div>
+<!-- Canvas Area (The "App" being built) -->
+<div class="flex-1 p-lg overflow-y-auto flex justify-center items-start">
+<!-- Mock Browser Window -->
+<div class="w-full max-w-[1024px] bg-[#0f0f11] rounded-xl border border-outline-variant/20 shadow-2xl overflow-hidden flex flex-col min-h-[600px] ring-1 ring-white/5">
+<!-- Mock App Header -->
+<div class="h-14 border-b border-white/5 px-6 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+<span class="material-symbols-outlined text-indigo-400 text-[18px]" data-icon="bar_chart">bar_chart</span>
+</div>
+<span class="text-white font-semibold tracking-wide">FinDash</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="w-64 h-8 rounded-full bg-white/5 border border-white/10 px-3 flex items-center">
+<span class="material-symbols-outlined text-white/40 text-[14px]" data-icon="search">search</span>
+</div>
+<div class="w-8 h-8 rounded-full bg-white/10"></div>
+</div>
+</div>
+<!-- Mock App Content (Showing 'generation' state) -->
+<div class="flex-1 p-6 grid grid-cols-3 gap-6 relative">
+<!-- Overlay indicating active building -->
+<div class="absolute inset-0 z-10 pointer-events-none rounded-b-xl overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-50"></div>
+</div>
+<!-- Stat Cards (Finished) -->
+<div class="col-span-3 grid grid-cols-3 gap-6">
+<div class="h-24 bg-white/5 border border-white/5 rounded-lg p-4 flex flex-col justify-between">
+<span class="text-white/50 text-sm">Total Revenue</span>
+<span class="text-white text-2xl font-semibold">$124,500.00</span>
+</div>
+<div class="h-24 bg-white/5 border border-white/5 rounded-lg p-4 flex flex-col justify-between">
+<span class="text-white/50 text-sm">Active Users</span>
+<span class="text-white text-2xl font-semibold">1,204</span>
+</div>
+<div class="h-24 bg-white/5 border border-white/5 rounded-lg p-4 flex flex-col justify-between">
+<span class="text-white/50 text-sm">Conversion Rate</span>
+<span class="text-white text-2xl font-semibold">3.4%</span>
+</div>
+</div>
+<!-- Main Chart (Generating Shimmer) -->
+<div class="col-span-2 h-[300px] bg-white/5 border border-indigo-500/30 rounded-lg p-4 relative overflow-hidden ring-1 ring-indigo-500/20">
+<!-- Generation highlight line -->
+<div class="absolute left-0 top-0 h-full w-[2px] bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></div>
+<div class="flex justify-between items-center mb-6">
+<div class="h-5 w-32 bg-white/10 rounded"></div>
+<div class="h-6 w-24 bg-white/5 rounded"></div>
+</div>
+<div class="w-full h-[200px] flex items-end gap-2 px-2">
+<div class="w-full bg-white/10 rounded-t h-[40%] animate-pulse"></div>
+<div class="w-full bg-white/10 rounded-t h-[60%] animate-pulse"></div>
+<div class="w-full bg-white/10 rounded-t h-[45%] animate-pulse"></div>
+<div class="w-full bg-white/10 rounded-t h-[80%] animate-pulse"></div>
+<div class="w-full bg-white/10 rounded-t h-[65%] animate-pulse"></div>
+<div class="w-full bg-white/10 rounded-t h-[90%] animate-pulse"></div>
+<div class="w-full bg-indigo-500/40 border-t border-indigo-400 rounded-t h-[30%] animate-shimmer"></div>
+</div>
+<!-- Contextual generation badge -->
+<div class="absolute bottom-4 right-4 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-1 rounded text-xs flex items-center gap-1 backdrop-blur-md">
+<span class="material-symbols-outlined text-[12px] animate-spin" data-icon="sync">sync</span>
+                                Writing Recharts logic
+                            </div>
+</div>
+<!-- Side List (Pending) -->
+<div class="col-span-1 h-[300px] bg-white/5 border border-white/5 rounded-lg p-4 flex flex-col gap-4 opacity-50">
+<div class="h-5 w-24 bg-white/10 rounded mb-2"></div>
+<div class="h-12 w-full bg-white/5 rounded"></div>
+<div class="h-12 w-full bg-white/5 rounded"></div>
+<div class="h-12 w-full bg-white/5 rounded"></div>
+<div class="h-12 w-full bg-white/5 rounded"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- RIGHT PANEL: File Structure & Code -->
+<aside class="w-[380px] flex flex-col border-l border-outline-variant/20 bg-surface-container-lowest shrink-0 z-10">
+<!-- File Tree (Top Half) -->
+<div class="h-[35%] flex flex-col border-b border-outline-variant/20">
+<div class="p-sm px-md flex items-center justify-between border-b border-outline-variant/10 bg-surface-container">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Explorer</span>
+<div class="flex gap-1">
+<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-container-high text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="note_add">note_add</span>
+</button>
+<button class="w-6 h-6 flex items-center justify-center rounded hover:bg-surface-container-high text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="create_new_folder">create_new_folder</span>
+</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-sm font-code-md text-code-md text-on-surface-variant">
+<ul class="flex flex-col">
+<!-- Folder structure mock -->
+<li>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="folder_open">folder_open</span>
+<span>src</span>
+</div>
+<ul class="pl-4 border-l border-outline-variant/10 ml-2.5 mt-1 flex flex-col gap-0.5">
+<li>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="folder">folder</span>
+<span>components</span>
+</div>
+<ul class="pl-4 border-l border-outline-variant/10 ml-2.5 mt-1 flex flex-col gap-0.5">
+<li>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-blue-400" data-icon="code">code</span>
+<span>StatCard.tsx</span>
+</div>
+</li>
+<li>
+<div class="flex items-center justify-between px-2 py-1 rounded bg-secondary-container/20 text-secondary border-l-2 border-secondary cursor-pointer">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[16px] text-secondary" data-icon="code">code</span>
+<span>DashboardCanvas.tsx</span>
+</div>
+<span class="material-symbols-outlined text-[12px] animate-pulse" data-icon="edit">edit</span>
+</div>
+</li>
+<li>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-blue-400" data-icon="code">code</span>
+<span>TransactionList.tsx</span>
+</div>
+</li>
+</ul>
+</li>
+<li>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low cursor-pointer">
+<span class="material-symbols-outlined text-[16px]" data-icon="folder">folder</span>
+<span>styles</span>
+</div>
+</li>
+<li>
+<div class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low cursor-pointer">
+<span class="material-symbols-outlined text-[16px] text-yellow-400" data-icon="javascript">javascript</span>
+<span>utils.ts</span>
+</div>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<!-- Code Viewer (Bottom Half) -->
+<div class="flex-1 flex flex-col overflow-hidden bg-[#0d0d0d] relative">
+<!-- Editor Tabs -->
+<div class="flex items-center border-b border-outline-variant/20 bg-[#161616] overflow-x-auto no-scrollbar">
+<div class="flex items-center gap-2 px-4 py-2 border-b-2 border-secondary text-secondary bg-[#1e1e1e] cursor-pointer min-w-max">
+<span class="material-symbols-outlined text-[14px]" data-icon="code">code</span>
+<span class="font-body-sm text-body-sm">DashboardCanvas.tsx</span>
+<span class="material-symbols-outlined text-[14px] ml-2 hover:text-white" data-icon="close">close</span>
+</div>
+<div class="flex items-center gap-2 px-4 py-2 text-on-surface-variant hover:bg-[#1e1e1e] cursor-pointer min-w-max">
+<span class="material-symbols-outlined text-[14px]" data-icon="code">code</span>
+<span class="font-body-sm text-body-sm">StatCard.tsx</span>
+</div>
+</div>
+<!-- Code Area -->
+<div class="flex-1 overflow-auto p-4 font-code-md text-[13px] leading-[22px]">
+<div class="flex">
+<!-- Line Numbers -->
+<div class="flex flex-col text-on-surface-variant/40 pr-4 select-none text-right shrink-0">
+<span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span>
+</div>
+<!-- Syntax Highlighted Code (Mock) -->
+<div class="flex-1 text-on-surface whitespace-pre overflow-x-auto">
+<span class="text-[#c678dd]">import</span> { <span class="text-[#e5c07b]">ResponsiveContainer</span>, <span class="text-[#e5c07b]">AreaChart</span>, <span class="text-[#e5c07b]">Area</span> } <span class="text-[#c678dd]">from</span> <span class="text-[#98c379]">'recharts'</span>;
+<span class="text-[#c678dd]">import</span> { <span class="text-[#e5c07b]">useState</span>, <span class="text-[#e5c07b]">useEffect</span> } <span class="text-[#c678dd]">from</span> <span class="text-[#98c379]">'react'</span>;
+
+<span class="text-[#c678dd]">export default function</span> <span class="text-[#61afef]">DashboardCanvas</span>() {
+  <span class="text-[#c678dd]">const</span> [data, setData] = <span class="text-[#56b6c2]">useState</span>([]);
+
+  <span class="text-[#56b6c2]">useEffect</span>(() <span class="text-[#c678dd]">=&gt;</span> {
+    <span class="text-[#5c6370] italic">// Fetching revenue data</span>
+<span class="text-[#61afef]">fetchData</span>().<span class="text-[#56b6c2]">then</span>(res <span class="text-[#c678dd]">=&gt;</span> <span class="text-[#56b6c2]">setData</span>(res));
+  }, []);
+
+  <span class="text-[#c678dd]">return</span> (
+    <span class="text-secondary/70">&lt;</span><span class="text-[#e06c75]">div</span> <span class="text-[#d19a66]">className</span>=<span <="" class="text-[#98c379]" span=""><span class="text-[#98c379]">p-6 grid grid-cols-3 gap-6</span><span <="" class="text-[#98c379]" span=""><span class="text-secondary/70">&gt;</span>
+      {<span class="text-[#5c6370] italic">/* AI is actively writing this section */</span>}
+      <span class="text-secondary/70">&lt;</span><span class="text-[#e06c75]">div</span> <span class="text-[#d19a66]">className</span>=<span <="" class="text-[#98c379]" span=""><span class="text-[#98c379]">col-span-2 bg-white/5 border border-indigo-500/30 rounded-lg p-4 relative</span><span <="" class="text-[#98c379]" span=""><span class="text-secondary/70">&gt;</span>
+<div class="bg-indigo-500/20 -mx-2 px-2 border-l-2 border-indigo-500 w-full animate-pulse"><span class="text-secondary/70">&lt;</span><span class="text-[#e5c07b]">ResponsiveContainer</span> <span class="text-[#d19a66]">width</span>=<span <="" class="text-[#98c379]" span=""><span class="text-[#98c379]">100%</span><span <="" class="text-[#98c379]" span=""> <span class="text-[#d19a66]">height</span>={<span class="text-[#d19a66]">200</span>}<span class="text-secondary/70">&gt;</span>
+<span class="text-secondary/70">&lt;</span><span class="text-[#e5c07b]">AreaChart</span> <span class="text-[#d19a66]">data</span>={<span class="text-on-surface">data</span>}<span class="text-secondary/70">&gt;</span>
+<span class="text-secondary/70">&lt;</span><span class="text-[#e5c07b]">Area</span> <span class="text-[#d19a66]">type</span>=<span <="" class="text-[#98c379]" span=""><span class="text-[#98c379]">monotone</span><span <="" class="text-[#98c379]" span=""> <span class="text-[#d19a66]">dataKey</span>=<span <="" class="text-[#98c379]" span=""><span class="text-[#98c379]">value</span><span <="" class="text-[#98c379]" span=""> <span class="text-[#d19a66]">stroke</span>=<span <="" class="text-[#98c379]" span=""><span class="text-[#98c379]">#6366f1</span><span <="" class="text-[#98c379]" span=""> <span class="text-[#d19a66]">fill</span>=<span <="" class="text-[#98c379]" span=""><span class="text-[#98c379]">#6366f140</span><span <="" class="text-[#98c379]" span=""> <span class="text-secondary/70">/&gt;</span></span></span></span></span></span></span></span></span></span></span></div>
+<span class="text-secondary/70">&lt;/</span><span class="text-[#e5c07b]">AreaChart</span><span class="text-secondary/70">&gt;</span>
+<span class="text-secondary/70">&lt;/</span><span class="text-[#e5c07b]">ResponsiveContainer</span><span class="text-secondary/70">&gt;</span>
+<span class="text-secondary/70">&lt;/</span><span class="text-[#e06c75]">div</span><span class="text-secondary/70">&gt;</span>
+<span class="text-secondary/70">&lt;/</span><span class="text-[#e06c75]">div</span><span class="text-secondary/70">&gt;</span>
+  );
+}</span></span></span></span></div>
+</div>
+</div>
+<!-- Floating Cursor (Simulating AI Typing) -->
+<div class="absolute top-[280px] left-[180px] flex items-center justify-center animate-pulse z-20 pointer-events-none">
+<div class="w-[2px] h-4 bg-secondary"></div>
+</div>
+</div>
+</aside>
+</main>
+</body></html>
