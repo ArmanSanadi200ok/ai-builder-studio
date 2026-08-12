@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
-export default function LoginPage() {
+export default function SignupPage() {
   return (
     <div className="bg-[#0A0A0A] text-on-surface min-h-screen flex items-center justify-center p-md font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container relative">
       {/* Background Pattern/Gradient (Subtle) */}
@@ -13,20 +13,32 @@ export default function LoginPage() {
           <div className="w-16 h-16 rounded-xl overflow-hidden mb-lg shadow-lg">
             <img alt="ABS Logo" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCtGudkTY9_nAvLthTaWRiVim4xTa__fUbima39ryJ6NgRNKLO1raznUhOyAvzNnozMa2xQnlk_SkDBD0RhZgBAYkuZ1xilLp5Doei8pBPYnRqUvOaNertr2tGtB-325mN2KVru2z2_dxJMzbShGJou4Ge4_OBCCJ-OP0vcS7nLZ-BH58oIqRj7ldixteWUVAguJ20qNqnVj_y5_yhR4ARP3_fCzI8QOCFc9o_JNPhB92GSqMLrBJXD" />
           </div>
-          <h1 className="font-headline-md text-headline-md text-on-surface mb-xs">Welcome Back</h1>
-          <p className="font-body-sm text-body-sm text-on-surface-variant">Sign in to continue to AI Builder Studio</p>
+          <h1 className="font-headline-md text-headline-md text-on-surface mb-xs">Create an Account</h1>
+          <p className="font-body-sm text-body-sm text-on-surface-variant">Sign up to continue to AI Builder Studio</p>
         </div>
 
         {/* Auth Card */}
         <div className="glass-panel rounded-xl border border-[#262626] p-lg shadow-2xl relative overflow-hidden bg-[#161616]/80 backdrop-blur-md">
           {/* Tabs (Sign In / Sign Up) */}
           <div className="flex border-b border-[#262626] mb-lg">
-            <div className="flex-1 pb-sm font-label-caps text-label-caps text-primary border-b-2 border-primary transition-colors text-center cursor-default">SIGN IN</div>
-            <Link href="/signup" className="flex-1 pb-sm font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors text-center inline-block">SIGN UP</Link>
+            <Link href="/login" className="flex-1 pb-sm font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors text-center inline-block">SIGN IN</Link>
+            <div className="flex-1 pb-sm font-label-caps text-label-caps text-primary border-b-2 border-primary transition-colors text-center cursor-default">SIGN UP</div>
           </div>
 
           {/* Form */}
           <form className="space-y-md">
+            {/* Name */}
+            <div className="space-y-xs">
+              <label className="block font-body-sm text-body-sm text-on-surface-variant" htmlFor="name">Full Name</label>
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-[18px]">person</span>
+                <input 
+                  className="w-full bg-[#0A0A0A] border border-[#262626] text-on-surface rounded-lg pl-10 pr-3 py-2 font-body-md text-body-md placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                  id="name" name="name" placeholder="Jane Doe" required type="text"
+                />
+              </div>
+            </div>
+
             {/* Email */}
             <div className="space-y-xs">
               <label className="block font-body-sm text-body-sm text-on-surface-variant" htmlFor="email">Email Address</label>
@@ -43,7 +55,6 @@ export default function LoginPage() {
             <div className="space-y-xs">
               <div className="flex justify-between items-center">
                 <label className="block font-body-sm text-body-sm text-on-surface-variant" htmlFor="password">Password</label>
-                <a className="font-body-sm text-body-sm text-primary hover:text-primary-container transition-colors" href="#">Forgot?</a>
               </div>
               <div className="relative">
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/50 text-[18px]">lock</span>
@@ -57,10 +68,10 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Sign In Button */}
+            {/* Sign Up Button */}
             <Link href="/dashboard" className="block mt-lg">
               <Button className="w-full text-base py-2 gap-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] h-10">
-                Sign In
+                Sign Up
                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
               </Button>
             </Link>
@@ -93,7 +104,7 @@ export default function LoginPage() {
 
         <div className="text-center mt-lg">
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Don't have an account? <Link className="text-primary hover:text-primary-container transition-colors font-medium" href="/signup">Create Account</Link>
+            Already have an account? <Link className="text-primary hover:text-primary-container transition-colors font-medium" href="/login">Sign In</Link>
           </p>
         </div>
       </main>

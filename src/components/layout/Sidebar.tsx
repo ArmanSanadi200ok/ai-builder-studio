@@ -24,16 +24,18 @@ export function Sidebar() {
     <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 flex-col p-md bg-surface-container border-r border-outline-variant/20">
       <div className="mb-xl">
         <div className="flex items-center gap-md">
-          <div className="w-10 h-10 rounded-lg bg-primary-container flex items-center justify-center text-white">
+          <div className="w-10 h-10 shrink-0 rounded-lg bg-primary-container flex items-center justify-center text-white">
             <span className="material-symbols-outlined text-[20px]">architecture</span>
           </div>
-          <div>
-            <h2 className="font-headline-sm text-headline-sm text-on-surface">AI Builder</h2>
-            <p className="font-body-sm text-body-sm text-on-surface-variant">v1.0.4-alpha</p>
+          <div className="min-w-0">
+            <h2 className="font-headline-sm text-headline-sm text-on-surface truncate">AI Builder</h2>
+            <p className="font-body-sm text-body-sm text-on-surface-variant truncate">v1.0.4-alpha</p>
           </div>
         </div>
       </div>
-      <Button className="mb-lg w-full">New App</Button>
+      <Link href="/dashboard/create" className="mb-lg block w-full">
+        <Button className="w-full">New App</Button>
+      </Link>
       <nav className="flex-1 space-y-1">
         {navItems.map((item) => {
           const isActive = pathname === item.href;

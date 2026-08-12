@@ -12,7 +12,7 @@ export default function CreateProjectPage() {
         {/* Header */}
         <div className="text-center space-y-sm">
           <h2 className="font-display-lg text-display-lg text-on-surface tracking-tight">What are we building today?</h2>
-          <p className="font-body-md text-body-md text-on-surface-variant max-w-xl mx-auto">Describe your vision. ABS will scaffold the architecture, connect providers, and generate the foundation.</p>
+          <p className="font-body-md text-body-md text-on-surface-variant max-w-prose mx-auto">Describe your vision. ABS will scaffold the architecture, connect providers, and generate the foundation.</p>
         </div>
 
         {/* Main Prompt Editor Area */}
