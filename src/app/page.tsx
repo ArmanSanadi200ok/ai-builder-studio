@@ -254,7 +254,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="w-full py-xl px-lg flex flex-col md:flex-row justify-between items-center max-w-container-max mx-auto bg-surface-container-lowest border-t border-outline-variant/10 mt-auto">
         <div className="font-label-caps text-label-caps text-on-surface-variant mb-4 md:mb-0">
-          © 2024 AI Builder Studio. Built for high-performance deep work.
+          AI Builder Studio &middot; Built by <a href="https://devloryx.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-on-surface hover:text-primary transition-colors">Devloryx</a>
         </div>
         <div className="flex items-center gap-md font-body-sm text-body-sm">
           <a className="text-on-surface-variant hover:text-on-surface transition-colors" href="#">Sitemap</a>
