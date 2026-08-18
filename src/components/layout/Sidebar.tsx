@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/providers", icon: "hub", label: "Providers" },
 ];
 
-export function Sidebar() {
+export function Sidebar({ user }: { user?: any }) {
   const pathname = usePathname();
 
   return (
@@ -60,14 +60,21 @@ export function Sidebar() {
           );
         })}
       </nav>
-      <div className="mt-auto pt-md border-t border-outline-variant/20">
-        <div className="flex items-center justify-between">
-          <span className="font-label-caps text-label-caps text-on-surface-variant">Profile</span>
-          <div className="w-8 h-8 rounded-full border border-outline-variant/50 bg-surface-container-high flex items-center justify-center text-on-surface">
-             <span className="material-symbols-outlined text-[16px]">person</span>
+      <Link href="/dashboard/profile" className="mt-auto pt-md border-t border-outline-variant/20 block hover:bg-surface-container-high transition-colors -mx-md px-md pb-md">
+        <div className="flex items-center gap-sm mt-md">
+          {user?.image ? (
+            <img src={user.image} alt={user.name || "User"} className="w-8 h-8 rounded-full border border-outline-variant/50" />
+          ) : (
+            <div className="w-8 h-8 rounded-full border border-outline-variant/50 bg-surface-container-high flex items-center justify-center text-on-surface">
+              <span className="material-symbols-outlined text-[16px]">person</span>
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="font-label-md text-label-md text-on-surface truncate">{user?.name || "Developer"}</p>
+            <p className="font-body-sm text-[10px] text-on-surface-variant truncate">{user?.email || "No email"}</p>
           </div>
         </div>
-      </div>
+      </Link>
     </aside>
   );
 }

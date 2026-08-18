@@ -3,11 +3,22 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import Link from "next/link";
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+import { auth } from "@/auth";
+
+import { redirect } from "next/navigation";
+
+export async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
+  const user = session?.user;
+  
+  if (!user) {
+    redirect("/login");
+  }
+
   return (
     <div className="flex h-screen overflow-hidden font-body-md text-body-md bg-surface-container-lowest">
-      <Topbar />
-      <Sidebar />
+      <Topbar user={user} />
+      <Sidebar user={user} />
       <main className="flex-1 ml-0 md:ml-64 mt-[72px] md:mt-0 p-lg md:p-xl overflow-y-auto h-full">
         {children}
       </main>
