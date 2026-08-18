@@ -4,6 +4,7 @@ import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 
 export const authConfig = {
+  trustHost: true,
   secret: process.env.AUTH_SECRET,
   session: { strategy: "jwt" as const },
   providers: [
