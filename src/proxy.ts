@@ -41,6 +41,18 @@ export const authConfig = {
       }
       return true;
     },
+    jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    session({ session, token }: { session: any; token: any }) {
+      if (token?.sub) {
+        session.user.id = token.sub;
+      }
+      return session;
+    },
   },
 } satisfies NextAuthConfig;
 
