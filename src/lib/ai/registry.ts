@@ -1,6 +1,7 @@
 export interface AIProviderConfig {
   id: string;
   name: string;
+  category?: "personal" | "abs";
   requiresKey: boolean;
   defaultModels: string[];
   // testKey takes the API key (and optional endpoint for ollama) and returns true if valid
@@ -187,6 +188,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
   custom: {
     id: "custom",
     name: "Custom (OpenAI Compatible)",
+    category: "personal",
     requiresKey: true,
     defaultModels: ["default"],
     testKey: async (key: string, endpoint: string = "") => {
@@ -200,5 +202,29 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         return false;
       }
     },
+  },
+  "abs-fast": {
+    id: "abs-fast",
+    name: "ABS Fast",
+    category: "abs",
+    requiresKey: false,
+    defaultModels: ["abs-fast-v1"],
+    testKey: async () => true,
+  },
+  "abs-pro": {
+    id: "abs-pro",
+    name: "ABS Pro",
+    category: "abs",
+    requiresKey: false,
+    defaultModels: ["abs-pro-v1"],
+    testKey: async () => true,
+  },
+  "abs-reasoning": {
+    id: "abs-reasoning",
+    name: "ABS Reasoning",
+    category: "abs",
+    requiresKey: false,
+    defaultModels: ["abs-reasoning-v1"],
+    testKey: async () => true,
   }
 };

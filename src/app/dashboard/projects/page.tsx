@@ -5,6 +5,7 @@ import { eq, desc } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { aiProviders } from "@/lib/ai/registry";
 
 export default async function ProjectsPage() {
   const session = await auth();
@@ -44,13 +45,16 @@ export default async function ProjectsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {userProjects.map((project) => {
             const isReady = project.status === "ready" || project.status === "deployed";
+            const providerInfo = project.selectedProvider ? aiProviders[project.selectedProvider] : null;
+            const categoryText = providerInfo?.category === "abs" ? "ABS AI" : "Personal LLM";
+            const providerName = providerInfo?.name || project.selectedProvider || "Unknown Provider";
             
             return (
               <div key={project.id} className="bg-surface-container rounded-xl p-md border border-outline-variant/30 flex flex-col justify-between group hover:border-primary/50 transition-colors">
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-headline-sm text-on-surface truncate pr-2" title={project.name}>{project.name}</h3>
-                    <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full ${
+                    <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-full shrink-0 ${
                       project.status === "deployed" ? "bg-primary/20 text-primary" :
                       project.status === "failed" ? "bg-error/10 text-error" :
                       "bg-surface-container-highest text-on-surface-variant"
@@ -62,15 +66,25 @@ export default async function ProjectsPage() {
                     {project.description || "No description provided."}
                   </p>
                   
-                  <div className="flex flex-col gap-1 mb-4 text-xs text-on-surface-variant">
+                  <div className="flex flex-col gap-2 mb-4 text-xs text-on-surface-variant border-t border-outline-variant/10 pt-3">
                     <div className="flex items-center gap-2">
                       <span className="material-symbols-outlined text-[14px]">calendar_today</span>
                       Updated {project.updatedAt.toLocaleDateString()}
                     </div>
                     {project.selectedProvider && (
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-[14px]">smart_toy</span>
-                        {project.selectedProvider} ({project.selectedModel || "default"})
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-bold text-on-surface-variant/70">
+                          {categoryText}
+                        </div>
+                        <div className="flex items-center gap-2 font-medium text-on-surface">
+                          <span className="material-symbols-outlined text-[14px]">
+                            {providerInfo?.category === "abs" ? "architecture" : "smart_toy"}
+                          </span>
+                          {providerName}
+                        </div>
+                        <div className="flex items-center gap-2 ml-5 text-on-surface-variant/80">
+                          {project.selectedModel}
+                        </div>
                       </div>
                     )}
                   </div>

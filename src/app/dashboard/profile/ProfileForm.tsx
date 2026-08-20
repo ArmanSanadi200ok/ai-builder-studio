@@ -39,19 +39,20 @@ export function ProfileForm({ initialName }: { initialName: string }) {
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full max-w-md">
-      <form onSubmit={handleSave} className="flex flex-col gap-4">
-        <div>
+    <div className="flex flex-col gap-6 w-full max-w-md mx-auto sm:mx-0">
+      <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-end">
+        <div className="w-full sm:flex-1">
           <label className="font-label-md text-on-surface mb-1 block">Full Name</label>
           <Input 
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={loading}
             required
+            className="w-full"
           />
         </div>
         
-        <Button type="submit" disabled={loading} className="w-fit">
+        <Button type="submit" disabled={loading} className="w-full sm:w-fit whitespace-nowrap">
           {loading ? "Saving..." : "Save Changes"}
         </Button>
       </form>

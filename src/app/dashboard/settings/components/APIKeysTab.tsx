@@ -20,7 +20,11 @@ export function APIKeysTab({ apiKeys }: { apiKeys: { provider: string; hasKey: b
     e.preventDefault();
     setLoading(true);
     try {
-      await saveApiKey(provider, key);
+      const result = await saveApiKey(provider, key);
+      if (!result.success && result.error) {
+        alert("Failed to save API key: " + result.error);
+        return;
+      }
       alert("API Key saved and validated successfully.");
       setKey(""); // Clear input on success
     } catch (err: any) {

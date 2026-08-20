@@ -24,18 +24,18 @@ export default async function ProfilePage() {
       </header>
 
       <div className="bg-surface-container rounded-xl p-lg border border-outline-variant/30 flex flex-col gap-6">
-        <div className="flex items-center gap-6">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
           {user.image ? (
-            <img src={user.image} alt={user.name || "Avatar"} className="w-24 h-24 rounded-full border border-outline-variant/50" />
+            <img src={user.image} alt={user.name || "Avatar"} className="w-24 h-24 rounded-full border border-outline-variant/50 shrink-0" />
           ) : (
-            <div className="w-24 h-24 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface border border-outline-variant/50">
+            <div className="w-24 h-24 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface border border-outline-variant/50 shrink-0">
               <span className="material-symbols-outlined text-[48px]">person</span>
             </div>
           )}
           
-          <div className="flex flex-col">
+          <div className="flex flex-col mt-2 sm:mt-0">
             <h2 className="font-headline-sm text-headline-sm text-on-surface">{user.name}</h2>
-            <p className="text-on-surface-variant">{user.email}</p>
+            <p className="text-on-surface-variant break-all">{user.email}</p>
             <p className="text-sm text-on-surface-variant mt-2">
               Joined {user.createdAt.toLocaleDateString()}
             </p>
