@@ -31,10 +31,10 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
   let initialCategory: "personal" | "abs" = "personal";
   
   const allAvailable = [...personalProviders, ...absProviders];
-  const foundInitial = allAvailable.find(p => p.id === initialProvider);
+  const foundInitial = personalProviders.find(p => p.id === initialProvider);
   if (!foundInitial) {
-    initialProvider = allAvailable[0]?.id || "openai";
-    initialCategory = allAvailable[0]?.category || "personal";
+    initialProvider = personalProviders[0]?.id || "";
+    initialCategory = personalProviders[0]?.category || "personal";
   } else {
     initialCategory = foundInitial.category || "personal";
   }
@@ -149,7 +149,7 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
                 {absProviders.length > 0 && (
                   <optgroup label="ABS AI (Coming Soon)">
                     {absProviders.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} (Preview)</option>
+                      <option key={p.id} value={p.id} disabled>{p.name} (Preview)</option>
                     ))}
                   </optgroup>
                 )}
@@ -177,8 +177,14 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
         </div>
 
         {/* Primary Action */}
-        <div className="pt-xl flex justify-center">
-          <Button type="submit" disabled={loading} className="py-md px-xl gap-sm h-auto text-base shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5">
+        <div className="pt-xl flex flex-col items-center gap-4">
+          {personalProviders.length === 0 && (
+            <div className="bg-error/10 text-error border border-error/20 rounded-lg p-3 text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">warning</span>
+              You must configure a Personal LLM in Settings before generating a project.
+            </div>
+          )}
+          <Button type="submit" disabled={loading || personalProviders.length === 0} className="py-md px-xl gap-sm h-auto text-base shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:-translate-y-0 disabled:hover:shadow-none">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
             <span className="font-headline-sm text-headline-sm tracking-wide">
               {loading ? "Preparing Pipeline..." : "Generate Project"}

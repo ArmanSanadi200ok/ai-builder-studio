@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { updateProfile, deleteAccount } from "@/app/actions/settings";
@@ -11,6 +11,10 @@ export function ProfileForm({ initialName }: { initialName: string }) {
   const [loading, setLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setName(initialName);
+  }, [initialName]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -40,7 +44,7 @@ export function ProfileForm({ initialName }: { initialName: string }) {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-md mx-auto sm:mx-0">
-      <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-end">
+      <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-end">
         <div className="w-full sm:flex-1">
           <label htmlFor="fullName" className="font-label-md text-on-surface mb-1 block">Full Name</label>
           <Input 

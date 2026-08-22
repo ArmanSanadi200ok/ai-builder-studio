@@ -6,6 +6,9 @@ import Link from "next/link";
 import { auth } from "@/auth";
 
 import { redirect } from "next/navigation";
+import { db } from "@/db";
+import { users } from "@/db/schema/users";
+import { eq } from "drizzle-orm";
 
 export async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -15,10 +18,15 @@ export async function DashboardLayout({ children }: { children: React.ReactNode 
     redirect("/login");
   }
 
+  // Fetch the latest user data from the DB so Topbar and Sidebar are always perfectly in sync
+  const dbUser = await db.query.users.findFirst({
+    where: eq(users.id, user.id as string)
+  });
+
   return (
     <div className="flex h-screen overflow-hidden font-body-md text-body-md bg-surface-container-lowest">
-      <Topbar user={user} />
-      <Sidebar user={user} />
+      <Topbar user={dbUser || user} />
+      <Sidebar user={dbUser || user} />
       <main className="flex-1 ml-0 md:ml-64 mt-[72px] md:mt-0 p-lg md:p-xl overflow-y-auto h-full">
         {children}
       </main>

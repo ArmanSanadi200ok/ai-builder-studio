@@ -30,7 +30,12 @@ export default async function SettingsPage() {
       </header>
 
       <SettingsTabs 
-        settings={settings || {}} 
+        settings={settings ? { 
+          defaultProvider: settings.defaultProvider, 
+          defaultModel: settings.defaultModel, 
+          ollamaEndpoint: settings.ollamaEndpoint,
+          aiFallbacks: settings.aiFallbacks
+        } : {}} 
         apiKeys={apiKeys.map(k => ({ provider: k.provider, hasKey: true }))}
         integrations={integrations.map(i => ({ provider: i.provider }))}
         envConfigured={{

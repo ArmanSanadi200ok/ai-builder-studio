@@ -26,8 +26,8 @@ export function IntegrationsTab({ integrations, envConfigured = { github: false,
             </span>
           </div>
           {envConfigured.vercel && (
-            <Button variant={hasVercel ? "secondary" : "primary"}>
-              {hasVercel ? "Disconnect" : "Connect Vercel"}
+            <Button variant="secondary" disabled>
+              Coming Soon
             </Button>
           )}
         </div>
@@ -57,8 +57,8 @@ export function IntegrationsTab({ integrations, envConfigured = { github: false,
             </span>
           </div>
           {envConfigured.github && (
-            <Button variant={hasGithub ? "secondary" : "primary"}>
-              {hasGithub ? "Disconnect" : "Connect GitHub"}
+            <Button variant="secondary" disabled>
+              Coming Soon
             </Button>
           )}
         </div>
@@ -67,6 +67,29 @@ export function IntegrationsTab({ integrations, envConfigured = { github: false,
             * GitHub Integration requires the GitHub OAuth App credentials to be configured by the administrator first.
           </p>
         )}
+      </div>
+
+      <div className="bg-surface-container-high rounded-xl p-lg border border-outline-variant/30 flex flex-col gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-lg bg-[#25D366] text-white flex items-center justify-center">
+            <span className="material-symbols-outlined text-[24px]">chat</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-headline-sm text-on-surface truncate">WhatsApp Business</h3>
+            <p className="text-on-surface-variant text-sm truncate">Deploy AI chatbots directly to WhatsApp.</p>
+          </div>
+        </div>
+        <div className="pt-4 border-t border-outline-variant/20 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-outline"></div>
+            <span className="font-label-md text-on-surface-variant">
+              Not Configured
+            </span>
+          </div>
+          <Button variant="secondary" disabled>
+            Coming Soon
+          </Button>
+        </div>
       </div>
     </div>
   );
