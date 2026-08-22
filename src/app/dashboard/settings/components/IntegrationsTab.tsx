@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/Button";
 
-export function IntegrationsTab({ integrations }: { integrations: { provider: string }[] }) {
+export function IntegrationsTab({ integrations, envConfigured = { github: false, vercel: false } }: { integrations: { provider: string }[], envConfigured?: { github: boolean, vercel: boolean } }) {
   const hasVercel = integrations.some(i => i.provider === "vercel");
   const hasGithub = integrations.some(i => i.provider === "github_integration");
 
@@ -13,23 +13,25 @@ export function IntegrationsTab({ integrations }: { integrations: { provider: st
           <div className="w-12 h-12 rounded-lg bg-black text-white flex items-center justify-center font-bold text-xl">
             V
           </div>
-          <div className="flex-1">
-            <h3 className="font-headline-sm text-on-surface">Vercel</h3>
-            <p className="text-on-surface-variant text-sm">Deploy generated AI applications directly to your Vercel account.</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-headline-sm text-on-surface truncate">Vercel</h3>
+            <p className="text-on-surface-variant text-sm truncate">Deploy generated AI applications.</p>
           </div>
         </div>
         <div className="pt-4 border-t border-outline-variant/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${hasVercel ? 'bg-primary' : 'bg-outline'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${hasVercel ? 'bg-primary' : (envConfigured.vercel ? 'bg-outline' : 'bg-error')}`}></div>
             <span className="font-label-md text-on-surface-variant">
-              {hasVercel ? "Connected" : "Not configured / Setup required"}
+              {hasVercel ? "Connected" : envConfigured.vercel ? "Ready to connect" : "OAuth configuration required"}
             </span>
           </div>
-          <Button variant={hasVercel ? "secondary" : "primary"} disabled>
-            {hasVercel ? "Disconnect" : "Connect Vercel"}
-          </Button>
+          {envConfigured.vercel && (
+            <Button variant={hasVercel ? "secondary" : "primary"}>
+              {hasVercel ? "Disconnect" : "Connect Vercel"}
+            </Button>
+          )}
         </div>
-        {!hasVercel && (
+        {!envConfigured.vercel && (
           <p className="text-xs text-on-surface-variant italic">
             * Vercel Integration requires the Vercel OAuth App credentials to be configured by the administrator first.
           </p>
@@ -42,25 +44,27 @@ export function IntegrationsTab({ integrations }: { integrations: { provider: st
             {/* GitHub Icon Placeholder */}
             <span className="material-symbols-outlined text-[24px]">code</span>
           </div>
-          <div className="flex-1">
-            <h3 className="font-headline-sm text-on-surface">GitHub Repositories</h3>
-            <p className="text-on-surface-variant text-sm">Push generated code directly to your GitHub account.</p>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-headline-sm text-on-surface truncate">GitHub Repositories</h3>
+            <p className="text-on-surface-variant text-sm truncate">Push generated code directly to GitHub.</p>
           </div>
         </div>
         <div className="pt-4 border-t border-outline-variant/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${hasGithub ? 'bg-primary' : 'bg-outline'}`}></div>
+            <div className={`w-2 h-2 rounded-full ${hasGithub ? 'bg-primary' : (envConfigured.github ? 'bg-outline' : 'bg-error')}`}></div>
             <span className="font-label-md text-on-surface-variant">
-              {hasGithub ? "Connected" : "Not configured / Setup required"}
+              {hasGithub ? "Connected" : envConfigured.github ? "Ready to connect" : "OAuth configuration required"}
             </span>
           </div>
-          <Button variant={hasGithub ? "secondary" : "primary"} disabled>
-            {hasGithub ? "Disconnect" : "Connect GitHub"}
-          </Button>
+          {envConfigured.github && (
+            <Button variant={hasGithub ? "secondary" : "primary"}>
+              {hasGithub ? "Disconnect" : "Connect GitHub"}
+            </Button>
+          )}
         </div>
-        {!hasGithub && (
+        {!envConfigured.github && (
           <p className="text-xs text-on-surface-variant italic">
-            * Note: This is separate from your login account. It requires explicit repository management scopes.
+            * GitHub Integration requires the GitHub OAuth App credentials to be configured by the administrator first.
           </p>
         )}
       </div>

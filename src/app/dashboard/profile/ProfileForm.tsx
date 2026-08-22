@@ -42,8 +42,11 @@ export function ProfileForm({ initialName }: { initialName: string }) {
     <div className="flex flex-col gap-6 w-full max-w-md mx-auto sm:mx-0">
       <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-end">
         <div className="w-full sm:flex-1">
-          <label className="font-label-md text-on-surface mb-1 block">Full Name</label>
+          <label htmlFor="fullName" className="font-label-md text-on-surface mb-1 block">Full Name</label>
           <Input 
+            id="fullName"
+            name="fullName"
+            autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={loading}

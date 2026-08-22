@@ -24,9 +24,9 @@ export default async function CreateProjectPage() {
 
   const allProviders = Object.values(aiProviders);
   
-  // Filter Personal LLMs (only if configured or doesn't require key)
+  // Filter Personal LLMs (only if explicitly configured)
   const personalProviders: ProviderOption[] = allProviders
-    .filter(p => (!p.category || p.category === "personal") && (configuredProvidersSet.has(p.id) || !p.requiresKey))
+    .filter(p => p.category === "personal" && configuredProvidersSet.has(p.id))
     .map(p => ({
       id: p.id,
       name: p.name,

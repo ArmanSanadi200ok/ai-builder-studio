@@ -24,7 +24,7 @@ export default async function ProvidersPage() {
   const defaultProvider = settings?.defaultProvider || "openai";
 
   const allProviders = Object.values(aiProviders);
-  const personalLLMs = allProviders.filter(p => !p.category || p.category === "personal");
+  const personalLLMs = allProviders.filter(p => p.category === "personal" && configuredProvidersSet.has(p.id));
   const absAI = allProviders.filter(p => p.category === "abs");
 
   const renderProvider = (provider: typeof aiProviders[keyof typeof aiProviders], isAbs = false) => {
@@ -54,8 +54,8 @@ export default async function ProvidersPage() {
               <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface border border-outline-variant/50 shrink-0">
                 <span className="material-symbols-outlined">{provider.id === 'openai' ? 'smart_toy' : provider.id.includes('google') ? 'search' : isAbs ? 'architecture' : 'psychology'}</span>
               </div>
-              <div>
-                <h3 className="font-headline-sm text-on-surface line-clamp-1">{provider.name}</h3>
+              <div className="min-w-0">
+                <h3 className="font-headline-sm text-on-surface truncate">{provider.name}</h3>
                 {isDefault && <span className="text-[10px] uppercase font-bold text-tertiary">Default Provider</span>}
               </div>
             </div>

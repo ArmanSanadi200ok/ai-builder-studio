@@ -18,9 +18,9 @@ export async function saveApiKey(provider: string, key: string, endpoint?: strin
   if (!aiProvider) return { success: false, error: "Invalid provider" };
 
   // Validate/test the key server-side first
-  const isValid = await aiProvider.testKey(key, endpoint);
-  if (!isValid) {
-    return { success: false, error: `Invalid API key for ${aiProvider.name}. Connection test failed.` };
+  const { valid, error } = await aiProvider.testKey(key, endpoint);
+  if (!valid) {
+    return { success: false, error: error ? `API Error: ${error}` : `Invalid API key for ${aiProvider.name}. Connection test failed.` };
   }
 
   // Encrypt

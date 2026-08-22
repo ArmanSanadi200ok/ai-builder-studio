@@ -5,7 +5,7 @@ import { AIPreferencesTab } from "./AIPreferencesTab";
 import { APIKeysTab } from "./APIKeysTab";
 import { IntegrationsTab } from "./IntegrationsTab";
 
-export function SettingsTabs({ settings, apiKeys, integrations }: { settings: any, apiKeys: any[], integrations: any[] }) {
+export function SettingsTabs({ settings, apiKeys, integrations, envConfigured = { github: false, vercel: false } }: { settings: any, apiKeys: any[], integrations: any[], envConfigured?: { github: boolean, vercel: boolean } }) {
   const [activeTab, setActiveTab] = useState("ai-preferences");
 
   const tabs = [
@@ -15,7 +15,7 @@ export function SettingsTabs({ settings, apiKeys, integrations }: { settings: an
   ];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 w-full">
       <div className="flex gap-2 border-b border-outline-variant/30 pb-2 overflow-x-auto">
         {tabs.map(tab => (
           <button
@@ -35,7 +35,7 @@ export function SettingsTabs({ settings, apiKeys, integrations }: { settings: an
       <div className="bg-surface-container rounded-b-xl rounded-tr-xl p-lg border border-outline-variant/30 min-h-[400px]">
         {activeTab === "ai-preferences" && <AIPreferencesTab settings={settings} />}
         {activeTab === "api-keys" && <APIKeysTab apiKeys={apiKeys} />}
-        {activeTab === "integrations" && <IntegrationsTab integrations={integrations} />}
+        {activeTab === "integrations" && <IntegrationsTab integrations={integrations} envConfigured={envConfigured} />}
       </div>
     </div>
   );

@@ -64,7 +64,7 @@ export function AIPreferencesTab({ settings }: { settings: any }) {
                 setProvider(e.target.value);
                 setModel(aiProviders[e.target.value]?.defaultModels[0] || "");
               }}
-              className="w-full bg-surface-container-high border border-outline-variant/50 text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none"
+              className="w-full bg-surface-container-high border border-outline-variant/50 text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none truncate"
             >
               {Object.values(aiProviders).map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
@@ -78,7 +78,7 @@ export function AIPreferencesTab({ settings }: { settings: any }) {
                 <select 
                   value={model} 
                   onChange={(e) => setModel(e.target.value)}
-                  className="w-full bg-surface-container-high border border-outline-variant/50 text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none"
+                  className="w-full bg-surface-container-high border border-outline-variant/50 text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none truncate"
                   disabled={loadingModels}
                 >
                   <option value="">{loadingModels ? "Loading models..." : "Select a model"}</option>
@@ -97,7 +97,7 @@ export function AIPreferencesTab({ settings }: { settings: any }) {
               <select 
                 value={model} 
                 onChange={(e) => setModel(e.target.value)}
-                className="w-full bg-surface-container-high border border-outline-variant/50 text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none"
+                className="w-full bg-surface-container-high border border-outline-variant/50 text-on-surface text-body-md rounded-lg focus:ring-primary focus:border-primary block p-2.5 outline-none truncate"
                 disabled={loadingModels}
               >
                 {loadingModels ? <option>Loading...</option> : availableModels.map(m => (

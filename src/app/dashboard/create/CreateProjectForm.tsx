@@ -70,13 +70,13 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
     
     setLoading(true);
     try {
-      await createProjectDraft({
+      const result = await createProjectDraft({
         name,
         description,
         provider,
         model
       });
-      router.push("/dashboard/projects");
+      router.push(`/workspace/${result.projectId}`);
     } catch (err: any) {
       alert(err.message || "Failed to generate project");
       setLoading(false);

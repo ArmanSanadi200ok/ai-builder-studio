@@ -33,6 +33,10 @@ export default async function SettingsPage() {
         settings={settings || {}} 
         apiKeys={apiKeys.map(k => ({ provider: k.provider, hasKey: true }))}
         integrations={integrations.map(i => ({ provider: i.provider }))}
+        envConfigured={{
+          github: !!process.env.AUTH_GITHUB_ID,
+          vercel: !!process.env.AUTH_VERCEL_ID // assuming this might be used later
+        }}
       />
     </div>
   );
