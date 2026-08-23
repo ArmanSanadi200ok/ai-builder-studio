@@ -33,9 +33,9 @@ export default async function ProfilePage() {
             </div>
           )}
           
-          <div className="flex flex-col mt-2 sm:mt-0">
-            <h2 className="font-headline-sm text-headline-sm text-on-surface">{user.name}</h2>
-            <p className="text-on-surface-variant break-all">{user.email}</p>
+          <div className="flex flex-col mt-2 sm:mt-0 min-w-0 w-full">
+            <h2 className="font-headline-sm text-headline-sm text-on-surface truncate">{user.name}</h2>
+            <p className="text-on-surface-variant truncate">{user.email}</p>
             <p className="text-sm text-on-surface-variant mt-2">
               Joined {user.createdAt.toLocaleDateString()}
             </p>

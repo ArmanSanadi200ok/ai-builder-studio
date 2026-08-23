@@ -21,20 +21,8 @@ export default function LoginPage() {
 
         {/* Auth Card */}
         <div className="glass-panel rounded-xl border border-[#262626] p-lg shadow-2xl relative overflow-hidden bg-[#161616]/80 backdrop-blur-md">
-          {/* Tabs (Sign In / Sign Up) */}
-          <div className="flex border-b border-[#262626] mb-lg">
-            <div className="flex-1 pb-sm font-label-caps text-label-caps text-primary border-b-2 border-primary transition-colors text-center cursor-default">SIGN IN</div>
-            <Link href="/signup" className="flex-1 pb-sm font-label-caps text-label-caps text-on-surface-variant hover:text-on-surface transition-colors text-center inline-block">SIGN UP</Link>
-          </div>
-
-          {/* Form */}
-          <LoginForm />
-
-          {/* Divider */}
-          <div className="relative flex items-center py-lg">
-            <div className="flex-grow border-t border-[#262626]"></div>
-            <span className="flex-shrink-0 mx-4 font-body-sm text-body-sm text-on-surface-variant">or</span>
-            <div className="flex-grow border-t border-[#262626]"></div>
+          <div className="flex flex-col items-center justify-center mb-6">
+            <p className="font-label-lg text-label-lg text-on-surface-variant text-center">Continue with your preferred social account</p>
           </div>
 
           {/* Social Auth */}
@@ -79,12 +67,6 @@ export default function LoginPage() {
               Continue with GitHub
             </button>
           </form>
-        </div>
-
-        <div className="text-center mt-lg">
-          <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Don't have an account? <Link className="text-primary hover:text-primary-container transition-colors font-medium" href="/signup">Create Account</Link>
-          </p>
         </div>
       </main>
     </div>
