@@ -85,7 +85,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
     name: "Groq",
     category: "personal",
     requiresKey: true,
-    defaultModels: ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"],
+    defaultModels: ["llama3-70b-8192", "llama3-8b-8192", "openai/gpt-oss-20b"],
     testKey: async (key: string) => handleFetchTest("https://api.groq.com/openai/v1/models", { Authorization: `Bearer ${key}` }),
   },
   openrouter: {

@@ -21,7 +21,10 @@ export async function POST(req: Request) {
     if (!project) return new Response("Project not found", { status: 404 });
 
     const providerId = project.selectedProvider || "openai";
-    const modelId = project.selectedModel || "gpt-4o";
+    let modelId = project.selectedModel || "gpt-4o";
+    if (providerId === "groq" && modelId === "mixtral-8x7b-32768") {
+      modelId = "openai/gpt-oss-20b";
+    }
     const aiProvider = aiProviders[providerId];
 
     if (!aiProvider) return new Response("Invalid provider", { status: 400 });
