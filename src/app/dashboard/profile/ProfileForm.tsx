@@ -1,33 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { updateProfile, deleteAccount } from "@/app/actions/settings";
+import { deleteAccount } from "@/app/actions/settings";
 import { useRouter } from "next/navigation";
 
-export function ProfileForm({ initialName }: { initialName: string }) {
-  const [name, setName] = useState(initialName);
-  const [loading, setLoading] = useState(false);
+export function ProfileForm() {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    setName(initialName);
-  }, [initialName]);
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await updateProfile(name);
-      alert("Profile updated successfully!");
-    } catch (err: any) {
-      alert("Failed to update profile: " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete your account? This action cannot be undone.")) return;
@@ -44,27 +24,7 @@ export function ProfileForm({ initialName }: { initialName: string }) {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-md mx-auto sm:mx-0">
-      <form onSubmit={handleSave} className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-end">
-        <div className="w-full sm:flex-1">
-          <label htmlFor="fullName" className="font-label-md text-on-surface mb-1 block">Full Name</label>
-          <Input 
-            id="fullName"
-            name="fullName"
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={loading}
-            required
-            className="w-full"
-          />
-        </div>
-        
-        <Button type="submit" disabled={loading} className="w-full sm:w-fit whitespace-nowrap">
-          {loading ? "Saving..." : "Save Changes"}
-        </Button>
-      </form>
-
-      <div className="mt-8 pt-6 border-t border-error/20 flex flex-col gap-4">
+      <div className="pt-2 flex flex-col gap-4">
         <h3 className="font-headline-sm text-error">Danger Zone</h3>
         <p className="text-on-surface-variant text-sm">
           Once you delete your account, there is no going back. Please be certain.

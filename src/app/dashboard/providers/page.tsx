@@ -106,9 +106,22 @@ export default async function ProvidersPage() {
           <h2 className="font-headline-sm text-on-surface">Personal LLMs</h2>
           <p className="text-body-sm text-on-surface-variant">Connect your own AI providers and API keys.</p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {personalLLMs.map(p => renderProvider(p, false))}
-        </div>
+        {personalLLMs.length === 0 ? (
+          <div className="bg-surface-container-high rounded-xl p-lg border border-outline-variant/30 text-center">
+            <span className="material-symbols-outlined text-[48px] text-on-surface-variant mb-4">vpn_key_off</span>
+            <h3 className="font-headline-sm text-on-surface mb-2">No Providers Connected</h3>
+            <p className="text-body-sm text-on-surface-variant mb-6">
+              You haven't configured any personal LLM API keys yet.
+            </p>
+            <Link href="/dashboard/settings">
+              <Button>Configure API Keys</Button>
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {personalLLMs.map(p => renderProvider(p, false))}
+          </div>
+        )}
       </section>
 
       <section>

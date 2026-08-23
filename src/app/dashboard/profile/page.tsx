@@ -42,7 +42,7 @@ export default async function ProfilePage() {
           </div>
         </div>
 
-        <ProfileForm initialName={user.name || ""} />
+        <ProfileForm />
       </div>
     </div>
   );

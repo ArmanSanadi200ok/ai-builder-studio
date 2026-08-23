@@ -23,10 +23,17 @@ export async function DashboardLayout({ children }: { children: React.ReactNode 
     where: eq(users.id, user.id as string)
   });
 
+  const serializableUser = dbUser ? {
+    id: dbUser.id,
+    name: dbUser.name,
+    email: dbUser.email,
+    image: dbUser.image
+  } : user;
+
   return (
     <div className="flex h-screen overflow-hidden font-body-md text-body-md bg-surface-container-lowest">
-      <Topbar user={dbUser || user} />
-      <Sidebar user={dbUser || user} />
+      <Topbar user={serializableUser} />
+      <Sidebar user={serializableUser} />
       <main className="flex-1 ml-0 md:ml-64 mt-[72px] md:mt-0 p-lg md:p-xl overflow-y-auto h-full">
         {children}
       </main>
