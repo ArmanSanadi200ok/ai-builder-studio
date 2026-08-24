@@ -1,8 +1,8 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { projects } from "@/db/schema/projects";
+import { projects, projectVersions, projectFiles } from "@/db/schema/projects";
 import { userApiKeys } from "@/db/schema/users";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
 import { aiProviders } from "@/lib/ai/registry";
 
@@ -55,8 +55,40 @@ export async function POST(req: Request) {
       return new Response(`${aiProvider.name} streaming is not yet supported in this foundation. Please use Groq or OpenAI.`, { status: 400 });
     }
 
+    // Fetch latest project state if it exists
+    const latestVersion = await db.query.projectVersions.findFirst({
+      where: eq(projectVersions.projectId, project.id),
+      orderBy: [desc(projectVersions.versionNumber)],
+    });
+
+    let currentProjectState = "No files generated yet.";
+    if (latestVersion) {
+      const files = await db.query.projectFiles.findMany({
+        where: eq(projectFiles.versionId, latestVersion.id),
+      });
+      if (files.length > 0) {
+        currentProjectState = files.map(f => `// ${f.path}\n${f.content}`).join("\n\n");
+      }
+    }
+
+    const systemPrompt = `You are the AI coding assistant working inside AI Builder Studio.
+
+Current project:
+Name: ${project.name}
+Original project request:
+${project.description || "No description provided."}
+Project ID: ${project.id}
+Current Provider: ${providerId}
+Current Model: ${modelId}
+Project Status: ${project.status}
+
+Latest Generated State:
+${currentProjectState}
+
+Your job is to help the user build and modify this specific project. Respond in markdown containing the code implementation.`;
+
     const messages = [
-      { role: "system", content: "You are an expert AI developer helping to build an application. You will respond in markdown containing the code implementation." },
+      { role: "system", content: systemPrompt },
       ...history,
       { role: "user", content: prompt }
     ];
