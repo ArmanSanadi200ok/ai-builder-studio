@@ -23,14 +23,19 @@ export async function POST(req: Request) {
 
     if (project.status === "draft") {
       // First prompt - dispatch durable generation job
-      await inngest.send({
-        name: "project/generate.requested",
-        data: {
-          projectId: project.id,
-          userId: session.user.id,
-          prompt: prompt,
-        },
-      });
+      try {
+        await inngest.send({
+          name: "project/generate.requested",
+          data: {
+            projectId: project.id,
+            userId: session.user.id,
+            prompt: prompt,
+          },
+        });
+      } catch (err: any) {
+        console.error("Inngest send error:", err);
+        return new Response(`Failed to start generation: ${err.message}`, { status: 500 });
+      }
 
       // Stream a message back to the UI indicating background generation has started
       const encoder = new TextEncoder();

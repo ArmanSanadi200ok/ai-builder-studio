@@ -161,7 +161,12 @@ Ensure you only output valid JSON without markdown wrapping.`;
 
           while (!success && currentProviderIndex < providerChain.length) {
             const providerId = providerChain[currentProviderIndex];
-            const modelId = providerId === "groq" ? "openai/gpt-oss-20b" : "gpt-4o";
+            let modelId = job.selectedModel as string;
+            if (providerId !== job.selectedProvider) {
+              if (providerId === "groq") modelId = "openai/gpt-oss-20b";
+              else if (providerId === "openrouter") modelId = "openai/gpt-4o";
+              else modelId = "gpt-4o";
+            }
             
             await db.update(projectJobs).set({ 
               currentStep: `Generating ${file.path} (${i + 1}/${filesToGenerate.length}) using ${providerId}`,
@@ -198,7 +203,7 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
           }
 
           if (!success) {
-            throw new Error(`Failed to generate ${file.path} after exhausting all providers.`);
+            throw new Error(`Failed to generate ${file.path} after exhausting all providers. No available fallback provider remains.`);
           }
           
           results.push({

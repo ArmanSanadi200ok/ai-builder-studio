@@ -38,8 +38,12 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   const [error, setError] = useState<string | null>(null);
   const [jobState, setJobState] = useState(initialJob);
   
-  const providerInfo = project.selectedProvider ? aiProviders[project.selectedProvider] : null;
-  const providerName = providerInfo?.name || project.selectedProvider || "Unknown";
+  // Use job provider if active to show failover
+  const activeProvider = (jobState && !["COMPLETED", "FAILED", "CANCELLED"].includes(jobState.status)) && jobState?.selectedProvider 
+    ? jobState.selectedProvider 
+    : project.selectedProvider;
+  const providerInfo = activeProvider ? aiProviders[activeProvider] : null;
+  const providerName = providerInfo?.name || activeProvider || "Unknown";
   
   // Job affects active status
   const isActiveJob = jobState && !["COMPLETED", "FAILED", "CANCELLED"].includes(jobState.status);
