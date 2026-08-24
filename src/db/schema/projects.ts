@@ -58,3 +58,26 @@ export const projectMessages = pgTable("project_message", {
   content: text("content").notNull(),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
+
+export const projectJobs = pgTable("project_job", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  projectId: text("projectId")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  userId: text("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  initialPrompt: text("initialPrompt").notNull(),
+  status: text("status", { enum: ["QUEUED", "PLANNING", "GENERATING", "VALIDATING", "BUILDING", "COMPLETED", "FAILED", "CANCELLED"] }).notNull().default("QUEUED"),
+  currentStep: text("currentStep"),
+  selectedProvider: text("selectedProvider"),
+  selectedModel: text("selectedModel"),
+  retryCount: integer("retryCount").notNull().default(0),
+  errorMessage: text("errorMessage"),
+  startedAt: timestamp("startedAt", { mode: "date" }),
+  completedAt: timestamp("completedAt", { mode: "date" }),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+});

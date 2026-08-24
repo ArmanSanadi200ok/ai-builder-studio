@@ -20,9 +20,15 @@ interface WorkspaceClientProps {
     content: string;
     createdAt: string;
   }[];
+  initialJob?: {
+    id: string;
+    status: string;
+    currentStep: string | null;
+    selectedProvider: string | null;
+  } | null;
 }
 
-export function WorkspaceClient({ project, initialMessages = [] }: WorkspaceClientProps) {
+export function WorkspaceClient({ project, initialMessages = [], initialJob = null }: WorkspaceClientProps) {
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState(project.status);
   const [messages, setMessages] = useState<{role: string, content: string}[]>(
@@ -30,10 +36,41 @@ export function WorkspaceClient({ project, initialMessages = [] }: WorkspaceClie
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [jobState, setJobState] = useState(initialJob);
   
   const providerInfo = project.selectedProvider ? aiProviders[project.selectedProvider] : null;
   const providerName = providerInfo?.name || project.selectedProvider || "Unknown";
-  const statusColor = status === "ready" || status === "deployed" ? "#00a2e6" : "#6b7280";
+  
+  // Job affects active status
+  const isActiveJob = jobState && !["COMPLETED", "FAILED", "CANCELLED"].includes(jobState.status);
+  const displayStatus = isActiveJob ? "generating" : status;
+  const statusColor = displayStatus === "ready" || displayStatus === "deployed" ? "#00a2e6" : "#6b7280";
+
+  // Polling logic
+  useEffect(() => {
+    if (!isActiveJob) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/projects/${project.id}/job`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.job) {
+            setJobState(data.job);
+            if (data.job.status === "COMPLETED") {
+              setStatus("ready");
+              setIsGenerating(false);
+            } else if (data.job.status === "FAILED") {
+              setStatus("failed");
+              setIsGenerating(false);
+              setError(data.job.errorMessage || "Generation failed.");
+            }
+          }
+        }
+      } catch (err) {}
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [isActiveJob, project.id]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -152,7 +189,7 @@ export function WorkspaceClient({ project, initialMessages = [] }: WorkspaceClie
           <div>
             <h1 className="font-headline-sm text-headline-sm text-on-surface line-clamp-1">{project.name || "Workspace"}</h1>
             <div className="flex items-center gap-xs mt-0.5">
-              {status === "generating" ? (
+              {displayStatus === "generating" ? (
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00a2e6] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00a2e6]"></span>
@@ -161,7 +198,7 @@ export function WorkspaceClient({ project, initialMessages = [] }: WorkspaceClie
                 <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: statusColor }}></span>
               )}
               <span className="font-label-caps text-label-caps tracking-wider uppercase" style={{ color: statusColor }}>
-                {status === "generating" ? "LIVE GENERATION" : status}
+                {isActiveJob ? `JOB: ${jobState?.status}` : displayStatus}
               </span>
             </div>
           </div>
@@ -178,11 +215,11 @@ export function WorkspaceClient({ project, initialMessages = [] }: WorkspaceClie
             </div>
           </div>
           
-          <Button variant="secondary" size="sm" className="gap-xs hidden sm:flex" disabled={status === "generating"} onClick={() => handleSubmit()}>
+          <Button variant="secondary" size="sm" className="gap-xs hidden sm:flex" disabled={displayStatus === "generating"} onClick={() => handleSubmit()}>
             <span className="material-symbols-outlined text-[16px]">refresh</span>
             Regenerate
           </Button>
-          <Button variant="danger" size="sm" className="gap-xs hidden sm:flex" disabled={status !== "generating"} onClick={handleStop}>
+          <Button variant="danger" size="sm" className="gap-xs hidden sm:flex" disabled={displayStatus !== "generating"} onClick={handleStop}>
             <span className="material-symbols-outlined text-[16px]">stop_circle</span>
             Stop
           </Button>
@@ -310,7 +347,14 @@ export function WorkspaceClient({ project, initialMessages = [] }: WorkspaceClie
              <span className="font-label-caps text-label-caps text-on-surface-variant">Output & Code</span>
           </div>
           <div className="flex-1 flex flex-col text-on-surface-variant font-body-sm p-4 overflow-y-auto">
-            {messages.filter(m => m.role === 'assistant').length > 0 ? (
+            {isActiveJob ? (
+               <div className="flex-1 flex flex-col items-center justify-center text-center">
+                 <span className="material-symbols-outlined text-[48px] mb-4 text-[#00a2e6] animate-pulse">settings</span>
+                 <p className="text-sm text-on-surface font-semibold">{jobState?.currentStep || "Generating background job..."}</p>
+                 <p className="text-xs mt-2 opacity-70">Provider: {jobState?.selectedProvider || providerName}</p>
+                 <p className="text-xs mt-1 opacity-50">You can safely close this tab.</p>
+               </div>
+            ) : messages.filter(m => m.role === 'assistant').length > 0 ? (
               <div className="prose prose-invert prose-sm max-w-none w-full whitespace-pre-wrap font-mono text-xs">
                  {messages.filter(m => m.role === 'assistant').pop()?.content || ""}
               </div>

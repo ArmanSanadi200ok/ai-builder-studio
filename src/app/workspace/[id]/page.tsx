@@ -26,6 +26,14 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     orderBy: [asc(projectMessages.createdAt)],
   });
 
+  // Load active or latest job
+  const { projectJobs } = await import("@/db/schema/projects");
+  const { desc } = await import("drizzle-orm");
+  const latestJob = await db.query.projectJobs.findFirst({
+    where: eq(projectJobs.projectId, id),
+    orderBy: [desc(projectJobs.createdAt)],
+  });
+
   // Map to serializable objects
   const serializableProject = {
     id: project.id,
@@ -42,5 +50,12 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     createdAt: msg.createdAt.toISOString(),
   }));
 
-  return <WorkspaceClient project={serializableProject} initialMessages={serializableMessages} />;
+  const serializableJob = latestJob ? {
+    id: latestJob.id,
+    status: latestJob.status,
+    currentStep: latestJob.currentStep,
+    selectedProvider: latestJob.selectedProvider,
+  } : null;
+
+  return <WorkspaceClient project={serializableProject} initialMessages={serializableMessages} initialJob={serializableJob} />;
 }

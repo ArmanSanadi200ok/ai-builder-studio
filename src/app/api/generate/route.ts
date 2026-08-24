@@ -5,6 +5,7 @@ import { userApiKeys } from "@/db/schema/users";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
 import { aiProviders } from "@/lib/ai/registry";
+import { inngest } from "@/inngest/client";
 
 export async function POST(req: Request) {
   try {
@@ -19,6 +20,37 @@ export async function POST(req: Request) {
     });
 
     if (!project) return new Response("Project not found", { status: 404 });
+
+    if (project.status === "draft") {
+      // First prompt - dispatch durable generation job
+      await inngest.send({
+        name: "project/generate.requested",
+        data: {
+          projectId: project.id,
+          userId: session.user.id,
+          prompt: prompt,
+        },
+      });
+
+      // Stream a message back to the UI indicating background generation has started
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        start(controller) {
+          const msg = "Starting project generation in the background...\nYou can close this tab and the project will continue building.";
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: msg } }] })}\n\n`));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive"
+        }
+      });
+    }
 
     const providerId = project.selectedProvider || "openai";
     let modelId = project.selectedModel || "gpt-4o";
