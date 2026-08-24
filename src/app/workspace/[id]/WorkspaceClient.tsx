@@ -14,12 +14,20 @@ interface WorkspaceClientProps {
     selectedProvider: string | null;
     selectedModel: string | null;
   };
+  initialMessages?: {
+    id: string;
+    role: string;
+    content: string;
+    createdAt: string;
+  }[];
 }
 
-export function WorkspaceClient({ project }: WorkspaceClientProps) {
+export function WorkspaceClient({ project, initialMessages = [] }: WorkspaceClientProps) {
   const [prompt, setPrompt] = useState("");
   const [status, setStatus] = useState(project.status);
-  const [messages, setMessages] = useState<{role: string, content: string}[]>([]);
+  const [messages, setMessages] = useState<{role: string, content: string}[]>(
+    initialMessages.map(m => ({ role: m.role, content: m.content }))
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -68,8 +76,7 @@ export function WorkspaceClient({ project }: WorkspaceClientProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId: project.id,
-          prompt: userPrompt,
-          history: newMessages.slice(0, -1) // Exclude the user message we just sent from history payload to avoid duplication if we want, but OpenAI expects full history. Actually, let's just pass previous history.
+          prompt: userPrompt
         }),
         signal: abortControllerRef.current.signal
       });

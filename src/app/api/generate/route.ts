@@ -1,8 +1,8 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { projects, projectVersions, projectFiles } from "@/db/schema/projects";
+import { projects, projectVersions, projectFiles, projectMessages } from "@/db/schema/projects";
 import { userApiKeys } from "@/db/schema/users";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, asc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
 import { aiProviders } from "@/lib/ai/registry";
 
@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     const session = await auth();
     if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
 
-    const { projectId, prompt, history = [] } = await req.json();
+    const { projectId, prompt } = await req.json();
     if (!projectId || !prompt) return new Response("Missing parameters", { status: 400 });
 
     const project = await db.query.projects.findFirst({
@@ -87,9 +87,21 @@ ${currentProjectState}
 
 Your job is to help the user build and modify this specific project. Respond in markdown containing the code implementation.`;
 
+    // Load history from DB
+    const dbMessages = await db.query.projectMessages.findMany({
+      where: eq(projectMessages.projectId, project.id),
+      orderBy: [asc(projectMessages.createdAt)],
+    });
+    
+    // Keep only the most recent 20 messages for context size management
+    const serverHistory = dbMessages.slice(-20).map(m => ({
+      role: m.role as "user" | "assistant" | "system",
+      content: m.content,
+    }));
+
     const messages = [
       { role: "system", content: systemPrompt },
-      ...history,
+      ...serverHistory,
       { role: "user", content: prompt }
     ];
 
@@ -116,8 +128,50 @@ Your job is to help the user build and modify this specific project. Respond in 
       return new Response(`Provider Error: ${res.status} ${err}`, { status: res.status });
     }
 
-    // Stream directly back to client
-    return new Response(res.body, {
+    // Save user message
+    await db.insert(projectMessages).values({
+      projectId: project.id,
+      role: "user",
+      content: prompt,
+    });
+
+    let assistantContent = "";
+    const transformStream = new TransformStream({
+      transform(chunk, controller) {
+        const text = new TextDecoder("utf-8").decode(chunk, { stream: true });
+        const lines = text.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ") && line !== "data: [DONE]") {
+            try {
+              const data = JSON.parse(line.slice(6));
+              const delta = data.choices[0]?.delta?.content || "";
+              assistantContent += delta;
+            } catch (e) {}
+          }
+        }
+        controller.enqueue(chunk);
+      },
+      async flush() {
+        if (assistantContent) {
+          try {
+            await db.insert(projectMessages).values({
+              projectId: project.id,
+              role: "assistant",
+              content: assistantContent,
+            });
+          } catch(e) {
+            console.error("Failed to save assistant message", e);
+          }
+        }
+      }
+    });
+
+    if (!res.body) {
+      return new Response("No response body from provider", { status: 500 });
+    }
+
+    // Stream directly back to client through our transform stream
+    return new Response(res.body.pipeThrough(transformStream), {
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
