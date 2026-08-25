@@ -57,5 +57,23 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     selectedProvider: latestJob.selectedProvider,
   } : null;
 
-  return <WorkspaceClient project={serializableProject} initialMessages={serializableMessages} initialJob={serializableJob} />;
+  // Load generated files
+  const { projectVersions, projectFiles } = await import("@/db/schema/projects");
+  const latestVersion = await db.query.projectVersions.findFirst({
+    where: eq(projectVersions.projectId, id),
+    orderBy: [desc(projectVersions.versionNumber)],
+  });
+
+  let initialFiles: { path: string; content: string }[] = [];
+  if (latestVersion) {
+    const files = await db.query.projectFiles.findMany({
+      where: eq(projectFiles.versionId, latestVersion.id),
+    });
+    initialFiles = files.map(f => ({
+      path: f.path,
+      content: f.content,
+    }));
+  }
+
+  return <WorkspaceClient key={project.id} project={serializableProject} initialMessages={serializableMessages} initialJob={serializableJob} initialFiles={initialFiles} />;
 }

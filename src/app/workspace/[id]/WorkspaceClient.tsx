@@ -26,10 +26,15 @@ interface WorkspaceClientProps {
     currentStep: string | null;
     selectedProvider: string | null;
   } | null;
+  initialFiles?: {
+    path: string;
+    content: string;
+  }[];
 }
 
-export function WorkspaceClient({ project, initialMessages = [], initialJob = null }: WorkspaceClientProps) {
+export function WorkspaceClient({ project, initialMessages = [], initialJob = null, initialFiles = [] }: WorkspaceClientProps) {
   const [prompt, setPrompt] = useState("");
+  const [files, setFiles] = useState<{path: string, content: string}[]>(initialFiles);
   const [status, setStatus] = useState(project.status);
   const [messages, setMessages] = useState<{role: string, content: string}[]>(
     initialMessages.map(m => ({ role: m.role, content: m.content }))
@@ -337,8 +342,19 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               </div>
             ) : (
               <div className="w-full max-w-[800px] bg-[#0f0f11] rounded-xl border border-outline-variant/20 shadow-2xl overflow-hidden flex flex-col min-h-[500px] ring-1 ring-white/5 relative">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-on-surface-variant/50">Preview rendering coming soon</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+                  {files.length > 0 ? (
+                    <>
+                      <span className="material-symbols-outlined text-[48px] mb-4 text-[#00a2e6]">check_circle</span>
+                      <h2 className="font-headline-sm text-on-surface mb-2">Project Generated</h2>
+                      <p className="text-sm text-on-surface-variant max-w-md">
+                        {files.length} files were successfully generated for this project.
+                        Actual application preview rendering will be available soon.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-on-surface-variant/50">Preview rendering coming soon</p>
+                  )}
                 </div>
               </div>
             )}
@@ -358,6 +374,19 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
                  <p className="text-xs mt-2 opacity-70">Provider: {jobState?.selectedProvider || providerName}</p>
                  <p className="text-xs mt-1 opacity-50">You can safely close this tab.</p>
                </div>
+            ) : files.length > 0 ? (
+              <div className="flex flex-col gap-4 w-full">
+                {files.map((file, idx) => (
+                  <div key={idx} className="flex flex-col rounded bg-surface-container-highest border border-outline-variant/20 overflow-hidden">
+                    <div className="bg-surface-container-high px-3 py-1.5 border-b border-outline-variant/20 flex items-center justify-between">
+                      <span className="font-mono text-xs text-on-surface">{file.path}</span>
+                    </div>
+                    <div className="p-3 bg-[#0f0f11] text-xs font-mono text-on-surface-variant overflow-x-auto whitespace-pre">
+                      {file.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
             ) : messages.filter(m => m.role === 'assistant').length > 0 ? (
               <div className="prose prose-invert prose-sm max-w-none w-full whitespace-pre-wrap font-mono text-xs">
                  {messages.filter(m => m.role === 'assistant').pop()?.content || ""}

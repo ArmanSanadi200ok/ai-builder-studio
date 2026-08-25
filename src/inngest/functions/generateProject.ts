@@ -1,6 +1,6 @@
 import { inngest } from "@/inngest/client";
 import { db } from "@/db";
-import { projects, projectJobs, projectFiles, projectVersions } from "@/db/schema/projects";
+import { projects, projectJobs, projectFiles, projectVersions, projectMessages } from "@/db/schema/projects";
 import { userApiKeys } from "@/db/schema/users";
 import { eq, and, desc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
@@ -253,6 +253,13 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
           completedAt: new Date(),
         }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
+        
+        const fileList = generatedFiles.map((f: any) => `- ${f.path}`).join("\n");
+        await db.insert(projectMessages).values({
+          projectId: projectId,
+          role: "assistant",
+          content: `I have finished generating your project!\n\nHere are the files created:\n${fileList}\n\nYou can now preview the application or ask me to make modifications.`,
+        });
       });
 
     } catch (error: any) {

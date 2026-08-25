@@ -22,7 +22,14 @@ export async function POST(req: Request) {
     if (!project) return new Response("Project not found", { status: 404 });
 
     if (project.status === "draft") {
-      // First prompt - dispatch durable generation job
+      // First prompt - Save to DB so chat history persists immediately
+      await db.insert(projectMessages).values({
+        projectId: project.id,
+        role: "user",
+        content: prompt,
+      });
+
+      // Dispatch durable generation job
       try {
         await inngest.send({
           name: "project/generate.requested",
