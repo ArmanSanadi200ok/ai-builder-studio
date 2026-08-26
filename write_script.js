@@ -1,4 +1,6 @@
-import { inngest } from "@/inngest/client";
+import fs from 'fs';
+
+const content = `import { inngest } from "@/inngest/client";
 import { db } from "@/db";
 import { projects, projectJobs, projectFiles, projectVersions, projectMessages } from "@/db/schema/projects";
 import { userApiKeys } from "@/db/schema/users";
@@ -16,7 +18,7 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
     const keyRecord = await db.query.userApiKeys.findFirst({
       where: and(eq(userApiKeys.userId, userId), eq(userApiKeys.provider, providerId)),
     });
-    if (!keyRecord) throw new Error(`Missing API key for ${providerId}`);
+    if (!keyRecord) throw new Error(\`Missing API key for \${providerId}\`);
     apiKey = decryptKey(keyRecord.encryptedKey, keyRecord.iv);
   }
 
@@ -28,7 +30,7 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
   else if (providerId === "together") baseUrl = "https://api.together.xyz/v1";
   else if (providerId === "cerebras") baseUrl = "https://api.cerebras.ai/v1";
   else if (providerId === "anthropic" || providerId === "google") {
-    throw { message: `${aiProvider.name} is not currently supported for background generation.`, retryable: false };
+    throw { message: \`\${aiProvider.name} is not currently supported for background generation.\`, retryable: false };
   }
 
   const payload: any = {
@@ -40,11 +42,11 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
     payload.response_format = { type: "json_object" };
   }
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+  const res = await fetch(\`\${baseUrl}/chat/completions\`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: \`Bearer \${apiKey}\`,
     },
     body: JSON.stringify(payload),
   });
@@ -52,16 +54,16 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
   if (!res.ok) {
     const errorText = await res.text();
     const isRetryable = res.status === 429 || res.status >= 500;
-    throw { message: `Provider error ${res.status}: ${errorText}`, retryable: isRetryable, status: res.status };
+    throw { message: \`Provider error \${res.status}: \${errorText}\`, retryable: isRetryable, status: res.status };
   }
 
   const data = await res.json();
   let content = data.choices[0].message.content;
-  if (!isJson && content.startsWith("```")) {
-    const lines = content.split("\n");
-    if (lines[0].startsWith("```")) lines.shift();
-    if (lines[lines.length - 1].startsWith("```")) lines.pop();
-    content = lines.join("\n");
+  if (!isJson && content.startsWith("\`\`\`")) {
+    const lines = content.split("\\n");
+    if (lines[0].startsWith("\`\`\`")) lines.shift();
+    if (lines[lines.length - 1].startsWith("\`\`\`")) lines.pop();
+    content = lines.join("\\n");
   }
   return content;
 }
@@ -97,7 +99,7 @@ async function executeWithProviderChain(
     while (attempt < 3 && !providerExhausted) {
       try {
         await db.update(projectJobs).set({ 
-          currentStep: `${stepName} using ${providerId} (${modelId})`,
+          currentStep: \`\${stepName} using \${providerId} (\${modelId})\`,
           selectedProvider: providerId,
           selectedModel: modelId
         }).where(eq(projectJobs.id, jobId));
@@ -113,7 +115,7 @@ async function executeWithProviderChain(
            try {
              JSON.parse(content);
            } catch (e: any) {
-             throw { message: `Malformed JSON: ${e.message}`, retryable: true, status: 400 };
+             throw { message: \`Malformed JSON: \${e.message}\`, retryable: true, status: 400 };
            }
         }
         
@@ -124,7 +126,7 @@ async function executeWithProviderChain(
         const status = err.status;
         const msg = err.message || String(err);
         
-        attemptHistory.push(`[Attempt ${attemptHistory.length + 1}] Provider: ${providerId}, Model: ${modelId}, Status: ${status || 'Unknown'}, Error: ${msg}`);
+        attemptHistory.push(\`[Attempt \${attemptHistory.length + 1}] Provider: \${providerId}, Model: \${modelId}, Status: \${status || 'Unknown'}, Error: \${msg}\`);
 
         if (status === 401 || status === 403 || status === 402) {
            providerExhausted = true;
@@ -160,7 +162,7 @@ async function executeWithProviderChain(
     currentProviderIndex++;
   }
 
-  const finalErrorMsg = "No usable provider remains.\n\nFallback Trace:\n" + attemptHistory.join("\n");
+  const finalErrorMsg = "No usable provider remains.\\n\\nFallback Trace:\\n" + attemptHistory.join("\\n");
   throw new NonRetriableError(finalErrorMsg);
 }
 
@@ -258,11 +260,11 @@ export const generateProject = inngest.createFunction(
         await db.update(projectJobs).set({ status: "PLANNING", currentStep: "Analyzing requirements" }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "generating" }).where(eq(projects.id, projectId));
         
-        const systemPrompt = `You are an expert software architect.
+        const systemPrompt = \`You are an expert software architect.
 Create a file structure and implementation plan for the following project:
-${prompt}
+\${prompt}
 Respond in valid JSON format: { "files": [ { "path": "path/to/file.ts", "description": "What this file does" } ] }
-Ensure you only output valid JSON without markdown wrapping.`;
+Ensure you only output valid JSON without markdown wrapping.\`;
 
         const { content } = await executeWithProviderChain(
            job.id,
@@ -288,17 +290,17 @@ Ensure you only output valid JSON without markdown wrapping.`;
         for (let i = 0; i < filesToGenerate.length; i++) {
           const file = filesToGenerate[i];
           
-          let filePrompt = `You are implementing a project.
-Project Request: ${prompt}
-Your task is to write the complete content for the file: ${file.path}
-Description: ${file.description}
+          let filePrompt = \`You are implementing a project.
+Project Request: \${prompt}
+Your task is to write the complete content for the file: \${file.path}
+Description: \${file.description}
 
-Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`). No explanations.`;
+Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`). No explanations.\`;
 
           let isJsonFormat = false;
           if (file.path.endsWith('.json')) {
              isJsonFormat = true;
-             filePrompt += `\nEnsure the output is strictly valid JSON format.`;
+             filePrompt += \`\\nEnsure the output is strictly valid JSON format.\`;
           }
 
           const { content } = await executeWithProviderChain(
@@ -310,7 +312,7 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
              userId,
              filePrompt,
              isJsonFormat,
-             `Generating ${file.path} (${i + 1}/${filesToGenerate.length})`
+             \`Generating \${file.path} (\${i + 1}/\${filesToGenerate.length})\`
           );
           
           results.push({
@@ -359,11 +361,11 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
         }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
         
-        const fileList = generatedFiles.map((f: any) => `- ${f.path}`).join("\n");
+        const fileList = generatedFiles.map((f: any) => \`- \${f.path}\`).join("\\n");
         await db.insert(projectMessages).values({
           projectId: projectId,
           role: "assistant",
-          content: `I have finished generating your project!\n\nHere are the files created:\n${fileList}\n\nYou can now preview the application or ask me to make modifications.`,
+          content: \`I have finished generating your project!\\n\\nHere are the files created:\\n\${fileList}\\n\\nYou can now preview the application or ask me to make modifications.\`,
         });
       });
 
@@ -380,3 +382,6 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
     }
   }
 );
+\`;
+
+fs.writeFileSync('src/inngest/functions/generateProject.ts', content);

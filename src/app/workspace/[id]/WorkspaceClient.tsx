@@ -25,6 +25,7 @@ interface WorkspaceClientProps {
     status: string;
     currentStep: string | null;
     selectedProvider: string | null;
+    selectedModel: string | null;
   } | null;
   initialFiles?: {
     path: string;
@@ -43,10 +44,9 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   const [error, setError] = useState<string | null>(null);
   const [jobState, setJobState] = useState(initialJob);
   
-  // Use job provider if active to show failover
-  const activeProvider = (jobState && !["COMPLETED", "FAILED", "CANCELLED"].includes(jobState.status)) && jobState?.selectedProvider 
-    ? jobState.selectedProvider 
-    : project.selectedProvider;
+  // Always prefer jobState to show actual fallback provider/model
+  const activeProvider = jobState?.selectedProvider || project.selectedProvider;
+  const activeModel = jobState?.selectedModel || project.selectedModel;
   const providerInfo = activeProvider ? aiProviders[activeProvider] : null;
   const providerName = providerInfo?.name || activeProvider || "Unknown";
   
@@ -220,7 +220,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               <span className="material-symbols-outlined text-[16px]">
                 {providerInfo?.category === "abs" ? "architecture" : "smart_toy"}
               </span>
-              <span>{providerName}</span>
+              <span>{providerName} ({activeModel})</span>
             </div>
           </div>
           

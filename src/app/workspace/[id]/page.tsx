@@ -55,6 +55,7 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     status: latestJob.status,
     currentStep: latestJob.currentStep,
     selectedProvider: latestJob.selectedProvider,
+    selectedModel: latestJob.selectedModel,
   } : null;
 
   // Load generated files
