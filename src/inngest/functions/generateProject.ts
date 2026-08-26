@@ -21,6 +21,14 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
 
   let baseUrl = "https://api.openai.com/v1";
   if (providerId === "groq") baseUrl = "https://api.groq.com/openai/v1";
+  else if (providerId === "openrouter") baseUrl = "https://openrouter.ai/api/v1";
+  else if (providerId === "mistral") baseUrl = "https://api.mistral.ai/v1";
+  else if (providerId === "deepseek") baseUrl = "https://api.deepseek.com/v1";
+  else if (providerId === "together") baseUrl = "https://api.together.xyz/v1";
+  else if (providerId === "cerebras") baseUrl = "https://api.cerebras.ai/v1";
+  else if (providerId === "anthropic" || providerId === "google") {
+    throw { message: `${aiProvider.name} is not currently supported for background generation.`, retryable: false };
+  }
 
   const payload: any = {
     model: modelId,
@@ -163,8 +171,12 @@ Ensure you only output valid JSON without markdown wrapping.`;
             const providerId = providerChain[currentProviderIndex];
             let modelId = job.selectedModel as string;
             if (providerId !== job.selectedProvider) {
-              if (providerId === "groq") modelId = "openai/gpt-oss-20b";
+              if (providerId === "groq") modelId = "llama3-70b-8192";
               else if (providerId === "openrouter") modelId = "openai/gpt-4o";
+              else if (providerId === "mistral") modelId = "mistral-large-latest";
+              else if (providerId === "deepseek") modelId = "deepseek-coder";
+              else if (providerId === "together") modelId = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo";
+              else if (providerId === "cerebras") modelId = "llama3.1-70b";
               else modelId = "gpt-4o";
             }
             
@@ -174,15 +186,28 @@ Ensure you only output valid JSON without markdown wrapping.`;
               selectedModel: modelId
             }).where(eq(projectJobs.id, job.id));
             
-            const filePrompt = `You are implementing a project.
+            let filePrompt = `You are implementing a project.
 Project Request: ${prompt}
 Your task is to write the complete content for the file: ${file.path}
 Description: ${file.description}
 
 Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`). No explanations.`;
 
+            let isJsonFormat = false;
+            if (file.path.endsWith('.json')) {
+               isJsonFormat = true;
+               filePrompt += `\nEnsure the output is strictly valid JSON format.`;
+            }
+
             try {
-              content = await makeProviderRequest(providerId, modelId, userId, filePrompt, false);
+              content = await makeProviderRequest(providerId, modelId, userId, filePrompt, isJsonFormat);
+              if (isJsonFormat) {
+                try {
+                  JSON.parse(content);
+                } catch (e: any) {
+                  throw { message: `Malformed JSON: ${e.message}`, retryable: true };
+                }
+              }
               success = true;
             } catch (err: any) {
               if (err.retryable) {
