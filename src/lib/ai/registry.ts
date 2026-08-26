@@ -25,6 +25,17 @@ async function handleFetchTest(url: string, headers: any): Promise<{ valid: bool
   }
 }
 
+async function handleFetchModels(url: string, headers: any): Promise<string[]> {
+  try {
+    const res = await fetch(url, { headers });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data?.map((m: any) => m.id) || [];
+  } catch {
+    return [];
+  }
+}
+
 export const aiProviders: Record<string, AIProviderConfig> = {
   openai: {
     id: "openai",
@@ -85,8 +96,9 @@ export const aiProviders: Record<string, AIProviderConfig> = {
     name: "Groq",
     category: "personal",
     requiresKey: true,
-    defaultModels: ["llama3-70b-8192", "llama3-8b-8192", "mixtral-8x7b-32768"],
+    defaultModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
     testKey: async (key: string) => handleFetchTest("https://api.groq.com/openai/v1/models", { Authorization: `Bearer ${key}` }),
+    getModels: async (key: string) => handleFetchModels("https://api.groq.com/openai/v1/models", { Authorization: `Bearer ${key}` }),
   },
   openrouter: {
     id: "openrouter",
@@ -95,6 +107,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
     requiresKey: true,
     defaultModels: ["anthropic/claude-3.5-sonnet", "openai/gpt-4o", "meta-llama/llama-3-70b-instruct"],
     testKey: async (key: string) => handleFetchTest("https://openrouter.ai/api/v1/auth/key", { Authorization: `Bearer ${key}` }),
+    getModels: async (key: string) => handleFetchModels("https://openrouter.ai/api/v1/models", { Authorization: `Bearer ${key}` }),
   },
   deepseek: {
     id: "deepseek",

@@ -51,7 +51,7 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
   if (!res.ok) {
     const errorText = await res.text();
     const isRetryable = res.status === 429 || res.status >= 500;
-    throw { message: `Provider error ${res.status}: ${errorText}`, retryable: isRetryable };
+    throw { message: `Provider error ${res.status}: ${errorText}`, retryable: isRetryable, status: res.status };
   }
 
   const data = await res.json();
@@ -84,8 +84,34 @@ export const generateProject = inngest.createFunction(
 
       let providerId = project.selectedProvider || "openai";
       let modelId = project.selectedModel || "gpt-4o";
-      if (providerId === "groq" && modelId === "mixtral-8x7b-32768") {
-        modelId = "openai/gpt-oss-20b";
+
+      const aiProvider = aiProviders[providerId];
+      if (aiProvider) {
+        let isValid = true;
+        
+        if (aiProvider.getModels && aiProvider.requiresKey) {
+          const keyRecord = await db.query.userApiKeys.findFirst({
+            where: and(eq(userApiKeys.userId, userId), eq(userApiKeys.provider, providerId)),
+          });
+          if (keyRecord) {
+            try {
+              const apiKey = decryptKey(keyRecord.encryptedKey, keyRecord.iv);
+              const availableModels = await aiProvider.getModels(apiKey);
+              if (availableModels.length > 0 && !availableModels.includes(modelId)) {
+                isValid = false;
+              }
+            } catch (e) {
+              console.warn("Failed to discover models for", providerId);
+            }
+          }
+        }
+
+        const isKnownDecommissioned = providerId === "groq" && (modelId.includes("llama3-70b-8192") || modelId.includes("llama3-8b-8192") || modelId === "mixtral-8x7b-32768" || modelId === "openai/gpt-oss-20b");
+        
+        if (!isValid || isKnownDecommissioned) {
+           modelId = aiProvider.defaultModels[0];
+           await db.update(projects).set({ selectedModel: modelId }).where(eq(projects.id, projectId));
+        }
       }
 
       const existingActive = await db.query.projectJobs.findFirst({
@@ -171,13 +197,12 @@ Ensure you only output valid JSON without markdown wrapping.`;
             const providerId = providerChain[currentProviderIndex];
             let modelId = job.selectedModel as string;
             if (providerId !== job.selectedProvider) {
-              if (providerId === "groq") modelId = "llama3-70b-8192";
-              else if (providerId === "openrouter") modelId = "openai/gpt-4o";
-              else if (providerId === "mistral") modelId = "mistral-large-latest";
-              else if (providerId === "deepseek") modelId = "deepseek-coder";
-              else if (providerId === "together") modelId = "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo";
-              else if (providerId === "cerebras") modelId = "llama3.1-70b";
-              else modelId = "gpt-4o";
+              const aiProv = aiProviders[providerId];
+              if (aiProv && aiProv.defaultModels.length > 0) {
+                 modelId = aiProv.defaultModels[0];
+              } else {
+                 modelId = "gpt-4o";
+              }
             }
             
             await db.update(projectJobs).set({ 
@@ -210,6 +235,16 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
               }
               success = true;
             } catch (err: any) {
+              if (err.status === 400 || err.status === 404) {
+                 const aiProv = aiProviders[providerId];
+                 if (aiProv && modelId !== aiProv.defaultModels[0]) {
+                    modelId = aiProv.defaultModels[0];
+                    await db.update(projectJobs).set({ selectedModel: modelId }).where(eq(projectJobs.id, job.id));
+                    attempt++;
+                    continue; 
+                 }
+              }
+
               if (err.retryable) {
                 attempt++;
                 if (attempt >= 3) {
