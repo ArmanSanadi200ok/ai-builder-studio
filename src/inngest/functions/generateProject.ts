@@ -4,22 +4,35 @@ import { projects, projectJobs, projectFiles, projectVersions, projectMessages }
 import { userApiKeys } from "@/db/schema/users";
 import { eq, and, desc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
-import { aiProviders } from "@/lib/ai/registry";
+import { aiProviders, getLiveModels, ProviderModel } from "@/lib/ai/registry";
 import { NonRetriableError } from "inngest";
 
-async function makeProviderRequest(providerId: string, modelId: string, userId: string, systemPrompt: string, isJson: boolean = false) {
+type AttemptRecord = {
+  provider: string;
+  model: string;
+  status: number;
+  code: string;
+  retryCount: number;
+  result: "success" | "failed" | "fallback";
+};
+
+async function getDecryptedKey(providerId: string, userId: string): Promise<string | null> {
   const aiProvider = aiProviders[providerId];
-  if (!aiProvider) throw new Error("Invalid provider");
-
-  let apiKey = "";
-  if (aiProvider.requiresKey) {
-    const keyRecord = await db.query.userApiKeys.findFirst({
-      where: and(eq(userApiKeys.userId, userId), eq(userApiKeys.provider, providerId)),
-    });
-    if (!keyRecord) throw new Error(`Missing API key for ${providerId}`);
-    apiKey = decryptKey(keyRecord.encryptedKey, keyRecord.iv);
+  if (!aiProvider || !aiProvider.requiresKey) return "";
+  
+  const keyRecord = await db.query.userApiKeys.findFirst({
+    where: and(eq(userApiKeys.userId, userId), eq(userApiKeys.provider, providerId)),
+  });
+  if (!keyRecord) return null;
+  
+  try {
+    return decryptKey(keyRecord.encryptedKey, keyRecord.iv);
+  } catch (e) {
+    return null;
   }
+}
 
+async function makeProviderRequest(providerId: string, modelId: string, apiKey: string, systemPrompt: string, isJson: boolean = false) {
   let baseUrl = "https://api.openai.com/v1";
   if (providerId === "groq") baseUrl = "https://api.groq.com/openai/v1";
   else if (providerId === "openrouter") baseUrl = "https://openrouter.ai/api/v1";
@@ -28,7 +41,7 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
   else if (providerId === "together") baseUrl = "https://api.together.xyz/v1";
   else if (providerId === "cerebras") baseUrl = "https://api.cerebras.ai/v1";
   else if (providerId === "anthropic" || providerId === "google") {
-    throw { message: `${aiProvider.name} is not currently supported for background generation.`, retryable: false };
+    throw { message: `${aiProviders[providerId]?.name} is not currently supported for background generation.`, status: 400 };
   }
 
   const payload: any = {
@@ -50,9 +63,15 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    const isRetryable = res.status === 429 || res.status >= 500;
-    throw { message: `Provider error ${res.status}: ${errorText}`, retryable: isRetryable, status: res.status };
+    let errorText = await res.text();
+    let errorCode = "unknown";
+    try {
+      const j = JSON.parse(errorText);
+      errorCode = j.error?.code || j.error?.type || errorCode;
+      errorText = j.error?.message || errorText;
+    } catch (e) {}
+    
+    throw { message: errorText, status: res.status, code: errorCode };
   }
 
   const data = await res.json();
@@ -69,26 +88,23 @@ async function makeProviderRequest(providerId: string, modelId: string, userId: 
 async function executeWithProviderChain(
   jobId: string,
   projectId: string,
-  initialProvider: string,
-  initialModel: string,
-  providerChain: string[],
+  providerChain: { providerId: string, modelId: string }[],
   userId: string,
   prompt: string,
   isJson: boolean,
   stepName: string
 ) {
-  const attemptHistory: string[] = [];
+  const attemptHistory: AttemptRecord[] = [];
+  
   let currentProviderIndex = 0;
   
   while (currentProviderIndex < providerChain.length) {
-    const providerId = providerChain[currentProviderIndex];
-    let modelId = (providerId === initialProvider) ? initialModel : "gpt-4o";
-
-    if (providerId !== initialProvider) {
-      const aiProv = aiProviders[providerId];
-      if (aiProv && aiProv.defaultModels.length > 0) {
-         modelId = aiProv.defaultModels[0];
-      }
+    let { providerId, modelId } = providerChain[currentProviderIndex];
+    let apiKey = await getDecryptedKey(providerId, userId);
+    
+    if (apiKey === null) {
+      currentProviderIndex++;
+      continue;
     }
 
     let attempt = 0;
@@ -98,60 +114,108 @@ async function executeWithProviderChain(
       try {
         await db.update(projectJobs).set({ 
           currentStep: `${stepName} using ${providerId} (${modelId})`,
-          selectedProvider: providerId,
-          selectedModel: modelId
+          activeProvider: providerId,
+          activeModel: modelId
         }).where(eq(projectJobs.id, jobId));
         
         await db.update(projects).set({
-          selectedProvider: providerId,
-          selectedModel: modelId
+          activeProvider: providerId,
+          activeModel: modelId
         }).where(eq(projects.id, projectId));
 
-        let content = await makeProviderRequest(providerId, modelId, userId, prompt, isJson);
+        let content = await makeProviderRequest(providerId, modelId, apiKey as string, prompt, isJson);
         
         if (isJson) {
            try {
              JSON.parse(content);
            } catch (e: any) {
-             throw { message: `Malformed JSON: ${e.message}`, retryable: true, status: 400 };
+             throw { message: `Malformed JSON: ${e.message}`, status: 400, code: "malformed_json" };
            }
         }
+        
+        attemptHistory.push({
+          provider: providerId,
+          model: modelId,
+          status: 200,
+          code: "success",
+          retryCount: attempt,
+          result: "success"
+        });
         
         return { content, providerId, modelId };
 
       } catch (err: any) {
         attempt++;
-        const status = err.status;
+        const status = err.status || 500;
         const msg = err.message || String(err);
+        const code = err.code || "unknown";
         
-        attemptHistory.push(`[Attempt ${attemptHistory.length + 1}] Provider: ${providerId}, Model: ${modelId}, Status: ${status || 'Unknown'}, Error: ${msg}`);
+        const record: AttemptRecord = {
+          provider: providerId,
+          model: modelId,
+          status: status,
+          code: code,
+          retryCount: attempt,
+          result: "failed"
+        };
 
-        if (status === 401 || status === 403 || status === 402) {
+        if (status === 401 || status === 403) {
+           record.result = "fallback";
+           attemptHistory.push(record);
+           providerExhausted = true;
+           break;
+        }
+        
+        if (status === 402) {
+           record.result = "fallback";
+           attemptHistory.push(record);
            providerExhausted = true;
            break;
         }
 
-        if (status === 404 || status === 400) {
-           const aiProv = aiProviders[providerId];
-           if (aiProv && modelId !== aiProv.defaultModels[0]) {
-             modelId = aiProv.defaultModels[0];
-             continue;
-           } else {
-             providerExhausted = true;
-             break;
+        if (status === 404 || (status === 400 && (code === "model_not_found" || code === "model_decommissioned" || msg.toLowerCase().includes("model")))) {
+           // Model specifically failed. Resolve live again.
+           try {
+             // Must get fresh api key for live resolution
+             const liveModels = await getLiveModels(providerId, apiKey as string);
+             const available = liveModels.filter(m => m.isAvailable);
+             if (available.length > 0 && available[0].id !== modelId) {
+               record.result = "fallback";
+               attemptHistory.push(record);
+               modelId = available[0].id;
+               continue; // Same provider, new model
+             }
+           } catch (e) {
+             // Failed to resolve live models
            }
+           record.result = "fallback";
+           attemptHistory.push(record);
+           providerExhausted = true;
+           break;
+        }
+        
+        if (status === 400) {
+           // Not a model error, malformed request etc. Do not fallback models.
+           record.result = "failed";
+           attemptHistory.push(record);
+           throw new NonRetriableError(`Irrecoverable 400 Bad Request: ${msg}`);
         }
 
-        if (status === 429 || (status && status >= 500) || err.retryable) {
+        if (status === 429 || status >= 500) {
            if (attempt < 3) {
+             attemptHistory.push(record);
              await new Promise(r => setTimeout(r, 2000 * attempt));
              continue;
            } else {
+             record.result = "fallback";
+             attemptHistory.push(record);
              providerExhausted = true;
              break;
            }
         }
 
+        record.result = "fallback";
+        attemptHistory.push(record);
         providerExhausted = true;
         break;
       }
@@ -160,8 +224,11 @@ async function executeWithProviderChain(
     currentProviderIndex++;
   }
 
-  const finalErrorMsg = "No usable provider remains.\n\nFallback Trace:\n" + attemptHistory.join("\n");
-  throw new NonRetriableError(finalErrorMsg);
+  const historyStr = attemptHistory.map((r, i) => 
+    `[${i+1}] ${r.provider}/${r.model} | ${r.status} ${r.code} (${r.result})`
+  ).join("\n");
+  
+  throw new NonRetriableError(`No usable provider remains.\nFallback Trace:\n${historyStr}`);
 }
 
 export const generateProject = inngest.createFunction(
@@ -180,38 +247,6 @@ export const generateProject = inngest.createFunction(
 
       if (!project) throw new Error("Project not found");
 
-      let providerId = project.selectedProvider || "openai";
-      let modelId = project.selectedModel || "gpt-4o";
-
-      const aiProvider = aiProviders[providerId];
-      if (aiProvider) {
-        let isValid = true;
-        
-        if (aiProvider.getModels && aiProvider.requiresKey) {
-          const keyRecord = await db.query.userApiKeys.findFirst({
-            where: and(eq(userApiKeys.userId, userId), eq(userApiKeys.provider, providerId)),
-          });
-          if (keyRecord) {
-            try {
-              const apiKey = decryptKey(keyRecord.encryptedKey, keyRecord.iv);
-              const availableModels = await aiProvider.getModels(apiKey);
-              if (availableModels.length > 0 && !availableModels.includes(modelId)) {
-                isValid = false;
-              }
-            } catch (e) {
-              console.warn("Failed to discover models for", providerId);
-            }
-          }
-        }
-
-        const isKnownDecommissioned = providerId === "groq" && (modelId.includes("llama3-70b-8192") || modelId.includes("llama3-8b-8192") || modelId === "mixtral-8x7b-32768" || modelId === "openai/gpt-oss-20b");
-        
-        if (!isValid || isKnownDecommissioned) {
-           modelId = aiProvider.defaultModels[0];
-           await db.update(projects).set({ selectedModel: modelId }).where(eq(projects.id, projectId));
-        }
-      }
-
       const existingActive = await db.query.projectJobs.findFirst({
         where: and(
           eq(projectJobs.projectId, projectId),
@@ -223,6 +258,9 @@ export const generateProject = inngest.createFunction(
         throw new Error("Job already generating");
       }
 
+      let selectedProvider = project.selectedProvider || "openai";
+      let selectedModel = project.selectedModel || "gpt-4o";
+
       const [newJob] = await db
         .insert(projectJobs)
         .values({
@@ -230,14 +268,16 @@ export const generateProject = inngest.createFunction(
           userId,
           initialPrompt: prompt,
           status: "QUEUED",
-          selectedProvider: providerId,
-          selectedModel: modelId,
+          selectedProvider: selectedProvider,
+          selectedModel: selectedModel,
+          activeProvider: selectedProvider,
+          activeModel: selectedModel,
         })
         .returning();
 
       await db
         .update(projects)
-        .set({ status: "queued", description: prompt })
+        .set({ status: "queued", description: prompt, activeProvider: selectedProvider, activeModel: selectedModel })
         .where(eq(projects.id, projectId));
 
       return newJob;
@@ -246,11 +286,73 @@ export const generateProject = inngest.createFunction(
     try {
       // Create Provider Chain
       const providerChain = await step.run("build-provider-chain", async () => {
+        let initialProvider = job.selectedProvider || "openai";
+        let initialModel = job.selectedModel || "gpt-4o";
+
         const userKeys = await db.query.userApiKeys.findMany({
           where: eq(userApiKeys.userId, userId),
         });
-        const availableProviders = userKeys.map(k => k.provider);
-        return Array.from(new Set([job.selectedProvider as string, ...availableProviders]));
+        
+        const chain: { providerId: string, modelId: string }[] = [];
+        
+        // 1. Add requested provider first
+        const keyMap = new Map(userKeys.map(k => [k.provider, k]));
+        
+        const resolveProvider = async (providerId: string, preferredModel: string, isFallback: boolean) => {
+          const keyRecord = keyMap.get(providerId);
+          if (!keyRecord) return null;
+          let apiKey = "";
+          try { apiKey = decryptKey(keyRecord.encryptedKey, keyRecord.iv); } catch (e) { return null; }
+          
+          try {
+            const liveModels = await getLiveModels(providerId, apiKey);
+            const available = liveModels.filter(m => m.isAvailable);
+            if (available.length === 0) return null;
+            
+            // If preferred model is in liveModels, use it
+            if (preferredModel && available.find(m => m.id === preferredModel)) {
+               return preferredModel;
+            }
+
+            if (isFallback) {
+              if (providerId === "openrouter") {
+                const freeModels = available.filter(m => m.isFree);
+                if (freeModels.length > 0) return freeModels[0].id;
+                return null; // Avoid silent 402 on paid models if no credit confirmation
+              }
+              if (providerId === "cerebras" || providerId === "together") {
+                // Cannot guarantee free tier anymore, avoid as automatic fallback
+                return null;
+              }
+            }
+            
+            // Otherwise fallback to first available
+            return available[0].id;
+          } catch (e) {
+            return null;
+          }
+        };
+
+        const resolvedInitialModel = await resolveProvider(initialProvider, initialModel, false);
+        if (resolvedInitialModel) {
+          chain.push({ providerId: initialProvider, modelId: resolvedInitialModel });
+        }
+
+        // 2. Add other configured providers as fallbacks
+        for (const providerId of keyMap.keys()) {
+          if (providerId === initialProvider) continue;
+          
+          const resolvedFallbackModel = await resolveProvider(providerId, "", true);
+          if (resolvedFallbackModel) {
+             chain.push({ providerId, modelId: resolvedFallbackModel });
+          }
+        }
+        
+        if (chain.length === 0) {
+           throw new NonRetriableError("No valid API keys or models available.");
+        }
+
+        return chain;
       });
 
       // 2. Planning Phase
@@ -267,8 +369,6 @@ Ensure you only output valid JSON without markdown wrapping.`;
         const { content } = await executeWithProviderChain(
            job.id,
            projectId,
-           job.selectedProvider as string,
-           job.selectedModel as string,
            providerChain,
            userId,
            systemPrompt,
@@ -304,8 +404,6 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
           const { content } = await executeWithProviderChain(
              job.id,
              projectId,
-             job.selectedProvider as string,
-             job.selectedModel as string,
              providerChain,
              userId,
              filePrompt,
@@ -359,11 +457,11 @@ Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`
         }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
         
-        const fileList = generatedFiles.map((f: any) => `- ${f.path}`).join("\n");
+        const fileList = generatedFiles.map((f: any) => "- " + f.path).join("\n");
         await db.insert(projectMessages).values({
           projectId: projectId,
           role: "assistant",
-          content: `I have finished generating your project!\n\nHere are the files created:\n${fileList}\n\nYou can now preview the application or ask me to make modifications.`,
+          content: "I have finished generating your project!\n\nHere are the files created:\n" + fileList + "\n\nYou can now preview the application or ask me to make modifications.",
         });
       });
 

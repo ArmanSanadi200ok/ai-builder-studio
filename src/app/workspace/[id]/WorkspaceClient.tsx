@@ -214,14 +214,21 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
         </div>
         
         <div className="flex items-center gap-sm">
-          <div className="hidden md:flex items-center gap-2 mr-4 border-r border-outline-variant/20 pr-4">
-            <span className="font-label-caps text-label-caps text-on-surface-variant uppercase">Model:</span>
-            <div className="flex items-center gap-1.5 bg-surface-container px-2 py-1 rounded border border-primary/30 text-primary font-body-sm">
-              <span className="material-symbols-outlined text-[16px]">
+          <div className="hidden md:flex flex-col gap-0 mr-4 border-r border-outline-variant/20 pr-4">
+            <span className="font-label-caps text-[10px] text-on-surface-variant uppercase text-right">
+              {isActiveJob ? "Running:" : displayStatus === "ready" ? "Generated Using:" : "Requested:"}
+            </span>
+            <div className="flex items-center gap-1.5 text-primary font-body-sm justify-end">
+              <span className="material-symbols-outlined text-[14px]">
                 {providerInfo?.category === "abs" ? "architecture" : "smart_toy"}
               </span>
-              <span>{providerName} ({activeModel})</span>
+              <span className="text-[13px]">{providerName} ({activeModel})</span>
             </div>
+            {(project.selectedProvider && (activeProvider !== project.selectedProvider || activeModel !== project.selectedModel)) && (
+              <span className="text-[9px] text-on-surface-variant text-right mt-0.5">
+                Req: {project.selectedProvider} ({project.selectedModel})
+              </span>
+            )}
           </div>
           
           <Button variant="secondary" size="sm" className="gap-xs hidden sm:flex" disabled={displayStatus === "generating"} onClick={() => handleSubmit()}>

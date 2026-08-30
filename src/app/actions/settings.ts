@@ -173,7 +173,7 @@ export async function getAvailableModels(providerId: string, endpoint?: string):
       }
       const discovered = await provider.getModels(key, endpoint);
       if (discovered && discovered.length > 0) {
-        return discovered; // this is just a string[]
+        return discovered.map(m => m.id);
       }
     }
 

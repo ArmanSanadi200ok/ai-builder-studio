@@ -41,6 +41,8 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     status: project.status,
     selectedProvider: project.selectedProvider,
     selectedModel: project.selectedModel,
+    activeProvider: project.activeProvider,
+    activeModel: project.activeModel,
   };
 
   const serializableMessages = dbMessages.map(msg => ({
@@ -56,6 +58,8 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     currentStep: latestJob.currentStep,
     selectedProvider: latestJob.selectedProvider,
     selectedModel: latestJob.selectedModel,
+    activeProvider: latestJob.activeProvider,
+    activeModel: latestJob.activeModel,
   } : null;
 
   // Load generated files
