@@ -1,10 +1,12 @@
-import { inngest } from "@/inngest/client";
+import fs from 'fs';
+
+const content = `import { inngest } from "@/inngest/client";
 import { db } from "@/db";
 import { projects, projectJobs, projectFiles, projectVersions, projectMessages } from "@/db/schema/projects";
 import { userApiKeys } from "@/db/schema/users";
 import { eq, and, desc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
-import { aiProviders, getLiveModels, ProviderModel } from "@/lib/ai/registry";
+import { aiProviders, getLiveModels } from "@/lib/ai/registry";
 import { NonRetriableError } from "inngest";
 
 type AttemptRecord = {
@@ -13,7 +15,7 @@ type AttemptRecord = {
   stage: string;
   file?: string;
   status: string | number;
-  code: string;
+  code?: string;
   retryCount: number;
   result: "success" | "failed" | "fallback";
 };
@@ -43,7 +45,7 @@ async function makeProviderRequest(providerId: string, modelId: string, apiKey: 
   else if (providerId === "together") baseUrl = "https://api.together.xyz/v1";
   else if (providerId === "cerebras") baseUrl = "https://api.cerebras.ai/v1";
   else if (providerId === "anthropic" || providerId === "google") {
-    throw { message: `${aiProviders[providerId]?.name} is not currently supported for background generation.`, status: 400 };
+    throw { message: \`\${aiProviders[providerId]?.name} is not currently supported for background generation.\`, status: 400 };
   }
 
   const payload: any = {
@@ -56,14 +58,14 @@ async function makeProviderRequest(providerId: string, modelId: string, apiKey: 
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new Error("Request Timeout")), 180000);
+  const timeoutId = setTimeout(() => controller.abort(new Error("Request Timeout")), 120000); // 120s total timeout
 
   try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
+    const res = await fetch(\`\${baseUrl}/chat/completions\`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: \`Bearer \${apiKey}\`,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -84,17 +86,17 @@ async function makeProviderRequest(providerId: string, modelId: string, apiKey: 
 
     const data = await res.json();
     let content = data.choices[0].message.content;
-    if (!isJson && content.startsWith("```")) {
-      const lines = content.split("\n");
-      if (lines[0].startsWith("```")) lines.shift();
-      if (lines[lines.length - 1].startsWith("```")) lines.pop();
-      content = lines.join("\n");
+    if (!isJson && content.startsWith("\`\`\`")) {
+      const lines = content.split("\\n");
+      if (lines[0].startsWith("\`\`\`")) lines.shift();
+      if (lines[lines.length - 1].startsWith("\`\`\`")) lines.pop();
+      content = lines.join("\\n");
     }
     return content;
   } catch (err: any) {
     clearTimeout(timeoutId);
     if (err.name === 'AbortError' || err.message === 'Request Timeout') {
-        throw { message: "Upstream provider timed out after 180s", status: 408, code: "timeout" };
+        throw { message: "Upstream provider timed out after 120s", status: 408, code: "timeout" };
     }
     throw err;
   }
@@ -127,10 +129,10 @@ async function executeWithProviderChain(
     let attempt = 0;
     let providerExhausted = false;
 
-    while (attempt < 2 && !providerExhausted) {
+    while (attempt < 2 && !providerExhausted) { // Max 2 attempts per candidate
       try {
         await db.update(projectJobs).set({ 
-          currentStep: `${stepName} using ${providerId} (${modelId})`,
+          currentStep: \`\${stepName} using \${providerId} (\${modelId})\`,
           activeProvider: providerId,
           activeModel: modelId
         }).where(eq(projectJobs.id, jobId));
@@ -146,7 +148,7 @@ async function executeWithProviderChain(
            try {
              JSON.parse(content);
            } catch (e: any) {
-             throw { message: `Malformed JSON: ${e.message}`, status: 400, code: "malformed_json" };
+             throw { message: \`Malformed JSON: \${e.message}\`, status: 400, code: "malformed_json" };
            }
         }
         
@@ -197,7 +199,6 @@ async function executeWithProviderChain(
         if (status === 404 || (status === 400 && (code === "model_not_found" || code === "model_decommissioned" || msg.toLowerCase().includes("model")))) {
            // Model specifically failed. Resolve live again.
            try {
-             // Must get fresh api key for live resolution
              const liveModels = await getLiveModels(providerId, apiKey as string);
              const available = liveModels.filter(m => m.isAvailable);
              if (available.length > 0 && available[0].id !== modelId) {
@@ -206,9 +207,7 @@ async function executeWithProviderChain(
                modelId = available[0].id;
                continue; // Same provider, new model
              }
-           } catch (e) {
-             // Failed to resolve live models
-           }
+           } catch (e) {}
            record.result = "fallback";
            attemptHistory.push(record);
            providerExhausted = true;
@@ -219,7 +218,7 @@ async function executeWithProviderChain(
            // Not a model error, malformed request etc. Do not fallback models.
            record.result = "failed";
            attemptHistory.push(record);
-           throw new NonRetriableError(`Irrecoverable 400 Bad Request: ${msg}`);
+           throw new NonRetriableError(\`Irrecoverable 400 Bad Request: \${msg}\`);
         }
 
         if (status === 408 || status === 429 || status >= 500) {
@@ -246,10 +245,10 @@ async function executeWithProviderChain(
   }
 
   const historyStr = attemptHistory.map((r, i) => 
-    `[${i+1}] ${r.provider}/${r.model} | ${r.status} ${r.code} (${r.result})`
-  ).join("\n");
+    \`[\${i+1}] \${r.provider}/\${r.model} (\${r.stage} \${r.file ? r.file : ""}) | \${r.status} \${r.code} (\${r.result})\`
+  ).join("\\n");
   
-  throw new NonRetriableError(`No usable provider remains.\nFallback Trace:\n${historyStr}`);
+  throw new NonRetriableError(\`No usable provider remains.\\nFallback Trace:\\n\${historyStr}\`);
 }
 
 export const generateProject = inngest.createFunction(
@@ -258,7 +257,7 @@ export const generateProject = inngest.createFunction(
     name: "Generate Project Workflow",
     triggers: [{ event: "project/generate.requested" }],
     timeouts: {
-      finish: "1h",
+      finish: "1h", // Function-level safety timeout
     }
   },
   async ({ event, step }) => {
@@ -308,7 +307,7 @@ export const generateProject = inngest.createFunction(
     });
 
     try {
-      // Create Provider Chain
+      // 1. Create Provider Chain
       const providerChain = await step.run("build-provider-chain", async () => {
         let initialProvider = job.selectedProvider || "openai";
         let initialModel = job.selectedModel || "gpt-4o";
@@ -319,7 +318,6 @@ export const generateProject = inngest.createFunction(
         
         const chain: { providerId: string, modelId: string }[] = [];
         
-        // 1. Add requested provider first
         const keyMap = new Map(userKeys.map(k => [k.provider, k]));
         
         const resolveProvider = async (providerId: string, preferredModel: string, isFallback: boolean) => {
@@ -333,7 +331,6 @@ export const generateProject = inngest.createFunction(
             const available = liveModels.filter(m => m.isAvailable);
             if (available.length === 0) return null;
             
-            // If preferred model is in liveModels, use it
             if (preferredModel && available.find(m => m.id === preferredModel)) {
                return preferredModel;
             }
@@ -342,15 +339,13 @@ export const generateProject = inngest.createFunction(
               if (providerId === "openrouter") {
                 const freeModels = available.filter(m => m.isFree);
                 if (freeModels.length > 0) return freeModels[0].id;
-                return null; // Avoid silent 402 on paid models if no credit confirmation
+                return null;
               }
               if (providerId === "cerebras" || providerId === "together") {
-                // Cannot guarantee free tier anymore, avoid as automatic fallback
                 return null;
               }
             }
             
-            // Otherwise fallback to first available
             return available[0].id;
           } catch (e) {
             return null;
@@ -362,7 +357,6 @@ export const generateProject = inngest.createFunction(
           chain.push({ providerId: initialProvider, modelId: resolvedInitialModel });
         }
 
-        // 2. Add other configured providers as fallbacks
         for (const providerId of keyMap.keys()) {
           if (providerId === initialProvider) continue;
           
@@ -384,10 +378,11 @@ export const generateProject = inngest.createFunction(
         await db.update(projectJobs).set({ status: "PLANNING", currentStep: "Analyzing requirements" }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "generating" }).where(eq(projects.id, projectId));
         
-        const systemPrompt = "You are an expert software architect.\n" +
-"Create a file structure and implementation plan for the following project:\n" + prompt + "\n" +
-"Respond in valid JSON format: { \"files\": [ { \"path\": \"path/to/file.ts\", \"description\": \"What this file does\" } ] }\n" +
-"Ensure you only output valid JSON without markdown wrapping.";
+        const systemPrompt = \`You are an expert software architect.
+Create a file structure and implementation plan for the following project:
+\${prompt}
+Respond in valid JSON format: { "files": [ { "path": "path/to/file.ts", "description": "What this file does" } ] }
+Ensure you only output valid JSON without markdown wrapping.\`;
 
         const { content } = await executeWithProviderChain(
            job.id,
@@ -420,26 +415,27 @@ export const generateProject = inngest.createFunction(
         return newVersion.id;
       });
 
-      // 4. Generating Files with Fallback & Upsert
+      // 4. Generating Files with Fallback & Upsert (Step-Level Durability)
       const filesToGenerate = plan.files;
-      const generatedFiles: { path: string }[] = [];
+      const results = [];
       
       for (let i = 0; i < filesToGenerate.length; i++) {
         const file = filesToGenerate[i];
         
-        const fileResult = await step.run(`generate-file-${i}`, async () => {
-          await db.update(projectJobs).set({ status: "GENERATING", currentStep: `Generating ${file.path} (${i + 1}/${filesToGenerate.length})` }).where(eq(projectJobs.id, job.id));
+        const fileResult = await step.run(\`generate-file-\${i}\`, async () => {
+          await db.update(projectJobs).set({ status: "GENERATING", currentStep: \`Generating \${file.path} (\${i + 1}/\${filesToGenerate.length})\` }).where(eq(projectJobs.id, job.id));
           
-          let filePrompt = "You are implementing a project.\n" +
-"Project Request: " + prompt + "\n" +
-"Your task is to write the complete content for the file: " + file.path + "\n" +
-"Description: " + file.description + "\n\n" +
-"Output ONLY the raw file content. Do not wrap it in markdown code blocks (```). No explanations.";
+          let filePrompt = \`You are implementing a project.
+Project Request: \${prompt}
+Your task is to write the complete content for the file: \${file.path}
+Description: \${file.description}
+
+Output ONLY the raw file content. Do not wrap it in markdown code blocks (\`\`\`). No explanations.\`;
 
           let isJsonFormat = false;
           if (file.path.endsWith('.json')) {
              isJsonFormat = true;
-             filePrompt += "\nEnsure the output is strictly valid JSON format.";
+             filePrompt += \`\\nEnsure the output is strictly valid JSON format.\`;
           }
 
           const { content } = await executeWithProviderChain(
@@ -449,7 +445,7 @@ export const generateProject = inngest.createFunction(
              userId,
              filePrompt,
              isJsonFormat,
-             `Generating ${file.path} (${i + 1}/${filesToGenerate.length})`,
+             \`Generating \${file.path} (\${i + 1}/\${filesToGenerate.length})\`,
              "execution",
              file.path
           );
@@ -468,7 +464,7 @@ export const generateProject = inngest.createFunction(
           return { path: file.path };
         });
         
-        generatedFiles.push(fileResult);
+        results.push(fileResult);
       }
 
       // 5. Completion
@@ -480,11 +476,11 @@ export const generateProject = inngest.createFunction(
         }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
         
-        const fileList = generatedFiles.map((f: any) => "- " + f.path).join("\n");
+        const fileList = results.map((f: any) => "- " + f.path).join("\\n");
         await db.insert(projectMessages).values({
           projectId: projectId,
           role: "assistant",
-          content: "I have finished generating your project!\n\nHere are the files created:\n" + fileList + "\n\nYou can now preview the application or ask me to make modifications.",
+          content: "I have finished generating your project!\\n\\nHere are the files created:\\n" + fileList + "\\n\\nYou can now preview the application or ask me to make modifications.",
         });
       });
 
@@ -497,7 +493,10 @@ export const generateProject = inngest.createFunction(
         }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "failed" }).where(eq(projects.id, projectId));
       });
-      throw error;
+      throw error; // Let Inngest know this job failed completely (since it's a NonRetriableError, it won't retry)
     }
   }
 );
+`;
+
+fs.writeFileSync('src/inngest/functions/generateProject.ts', content);
