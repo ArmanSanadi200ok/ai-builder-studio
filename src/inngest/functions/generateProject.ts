@@ -257,12 +257,18 @@ export const generateProject = inngest.createFunction(
     id: "generate-project", 
     name: "Generate Project Workflow",
     triggers: [{ event: "project/generate.requested" }],
+    cancelOn: [
+      {
+        event: "project/generation.cancel-requested",
+        match: "data.projectId",
+      }
+    ],
     timeouts: {
       finish: "1h",
     }
   },
   async ({ event, step }) => {
-    const { projectId, userId, prompt } = event.data;
+    const { projectId, userId, prompt, attachmentId } = event.data;
 
     const job = await step.run("initialize-job", async () => {
       const project = await db.query.projects.findFirst({
@@ -384,8 +390,19 @@ export const generateProject = inngest.createFunction(
         await db.update(projectJobs).set({ status: "PLANNING", currentStep: "Analyzing requirements" }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "generating" }).where(eq(projects.id, projectId));
         
+        let contextText = "";
+        if (attachmentId) {
+          const { projectAttachments } = await import("@/db/schema/projects");
+          const attachment = await db.query.projectAttachments.findFirst({
+            where: eq(projectAttachments.id, attachmentId)
+          });
+          if (attachment?.extractedText) {
+            contextText = `\n\n--- PROVIDED ATTACHMENT CONTEXT ---\n${attachment.extractedText}\n--- END ATTACHMENT CONTEXT ---\n`;
+          }
+        }
+
         const systemPrompt = "You are an expert software architect.\n" +
-"Create a file structure and implementation plan for the following project:\n" + prompt + "\n" +
+"Create a file structure and implementation plan for the following project:\n" + prompt + contextText + "\n" +
 "Respond in valid JSON format: { \"files\": [ { \"path\": \"path/to/file.ts\", \"description\": \"What this file does\" } ] }\n" +
 "Ensure you only output valid JSON without markdown wrapping.";
 
@@ -399,7 +416,8 @@ export const generateProject = inngest.createFunction(
            "Analyzing requirements",
            "planning"
         );
-        return JSON.parse(content);
+        const parsedPlan = JSON.parse(content);
+        return { files: parsedPlan.files, contextText };
       });
 
       // 3. Initialize Version for Files
@@ -431,7 +449,7 @@ export const generateProject = inngest.createFunction(
           await db.update(projectJobs).set({ status: "GENERATING", currentStep: `Generating ${file.path} (${i + 1}/${filesToGenerate.length})` }).where(eq(projectJobs.id, job.id));
           
           let filePrompt = "You are implementing a project.\n" +
-"Project Request: " + prompt + "\n" +
+"Project Request: " + prompt + (plan.contextText || "") + "\n" +
 "Your task is to write the complete content for the file: " + file.path + "\n" +
 "Description: " + file.description + "\n\n" +
 "Output ONLY the raw file content. Do not wrap it in markdown code blocks (```). No explanations.";

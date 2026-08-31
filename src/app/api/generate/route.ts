@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { projects, projectVersions, projectFiles, projectMessages } from "@/db/schema/projects";
+import { projects, projectVersions, projectFiles, projectMessages, projectJobs } from "@/db/schema/projects";
 import { userApiKeys } from "@/db/schema/users";
 import { eq, and, desc, asc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const session = await auth();
     if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
 
-    const { projectId, prompt } = await req.json();
+    const { projectId, prompt, regenerate, attachmentId } = await req.json();
     if (!projectId || !prompt) return new Response("Missing parameters", { status: 400 });
 
     const project = await db.query.projects.findFirst({
@@ -21,7 +21,18 @@ export async function POST(req: Request) {
 
     if (!project) return new Response("Project not found", { status: 404 });
 
-    if (project.status === "draft") {
+    const activeJob = await db.query.projectJobs.findFirst({
+      where: and(
+        eq(projectJobs.projectId, projectId),
+        eq(projectJobs.status, "GENERATING")
+      ),
+    });
+
+    if (activeJob) {
+      return new Response("A generation is already running for this project", { status: 409 });
+    }
+
+    if (project.status === "draft" || regenerate) {
       // First prompt - Save to DB so chat history persists immediately
       await db.insert(projectMessages).values({
         projectId: project.id,
@@ -37,6 +48,7 @@ export async function POST(req: Request) {
             projectId: project.id,
             userId: session.user.id,
             prompt: prompt,
+            attachmentId: attachmentId || null,
           },
         });
       } catch (err: any) {
@@ -48,7 +60,9 @@ export async function POST(req: Request) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         start(controller) {
-          const msg = "Starting project generation in the background...\nYou can close this tab and the project will continue building.";
+          const msg = regenerate 
+            ? "Starting project regeneration in the background...\nYou can close this tab and the project will continue building."
+            : "Starting project generation in the background...\nYou can close this tab and the project will continue building.";
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: msg } }] })}\n\n`));
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();

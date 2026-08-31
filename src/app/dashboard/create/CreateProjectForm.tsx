@@ -45,6 +45,55 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
   const [modelsLoading, setModelsLoading] = useState(false);
   const [providerError, setProviderError] = useState<string | null>(null);
 
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const recognitionRef = React.useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setDescription(prev => (prev + ' ' + finalTranscript).trim());
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    }
+  }, []);
+
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      alert("Voice input is not supported in this browser.");
+      return;
+    }
+    if (isRecording) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+      setIsRecording(true);
+    }
+  };
+
   // Update available models when provider changes
   useEffect(() => {
     let active = true;
@@ -110,10 +159,28 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
         provider,
         model
       });
+
+      if (attachment) {
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append("file", attachment);
+        formData.append("projectId", result.projectId);
+        
+        try {
+          await fetch("/api/attachments", {
+            method: "POST",
+            body: formData,
+          });
+        } catch (e) {
+          console.error("Failed to upload attachment", e);
+        }
+      }
+
       router.push(`/workspace/${result.projectId}`);
     } catch (err: any) {
       alert(err.message || "Failed to generate project");
       setLoading(false);
+      setIsUploading(false);
     }
   }
 
@@ -138,12 +205,27 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
           
           <div className="flex items-center justify-between mt-sm border-t border-surface-container-highest pt-sm px-sm">
             <div className="flex items-center gap-sm">
-              <button type="button" className="text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded" title="Attach context">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setAttachment(f);
+                }} 
+                accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp" 
+              />
+              <button type="button" onClick={() => fileInputRef.current?.click()} className={`text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded ${attachment ? 'text-primary' : ''}`} title="Attach context">
                 <span className="material-symbols-outlined text-[20px]">attach_file</span>
               </button>
-              <button type="button" className="text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded" title="Use Voice">
+              <button type="button" onClick={toggleRecording} className={`text-on-surface-variant hover:text-on-surface transition-colors p-xs rounded ${isRecording ? 'text-error hover:text-error' : ''}`} title="Use Voice">
                 <span className="material-symbols-outlined text-[20px]">mic</span>
               </button>
+              {attachment && (
+                <span className="text-xs text-primary font-body-sm bg-primary/10 px-2 py-1 rounded truncate max-w-[150px]">
+                  {attachment.name}
+                </span>
+              )}
             </div>
             <div className="font-code-md text-code-md text-on-surface-variant/50">
               {description.length} / 2000
@@ -239,10 +321,10 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
               {providerError}
             </div>
           )}
-          <Button type="submit" disabled={loading || personalProviders.length === 0 || modelsLoading || !!providerError || availableModels.length === 0} className="py-md px-xl gap-sm h-auto text-base shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:-translate-y-0 disabled:hover:shadow-none">
+          <Button type="submit" disabled={loading || isUploading || personalProviders.length === 0 || modelsLoading || !!providerError || availableModels.length === 0} className="py-md px-xl gap-sm h-auto text-base shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:-translate-y-0 disabled:hover:shadow-none">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>bolt</span>
             <span className="font-headline-sm text-headline-sm tracking-wide">
-              {loading ? "Preparing Pipeline..." : "Generate Project"}
+              {loading || isUploading ? "Preparing Pipeline..." : "Generate Project"}
             </span>
           </Button>
         </div>

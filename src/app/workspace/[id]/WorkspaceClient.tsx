@@ -43,6 +43,90 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jobState, setJobState] = useState(initialJob);
+  const [attachment, setAttachment] = useState<any>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setPrompt(prev => (prev + ' ' + finalTranscript).trim());
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsRecording(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    }
+  }, []);
+
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      alert("Voice input is not supported in this browser.");
+      return;
+    }
+    if (isRecording) {
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
+      setIsRecording(true);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setError(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("projectId", project.id);
+
+    try {
+      const res = await fetch("/api/attachments", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errTxt = await res.text();
+        throw new Error(errTxt);
+      }
+
+      const data = await res.json();
+      setAttachment(data);
+    } catch (err: any) {
+      setError(err.message || "Failed to upload attachment");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
   
   // Always prefer jobState to show actual fallback provider/model
   const activeProvider = jobState?.selectedProvider || project.selectedProvider;
@@ -89,41 +173,81 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleStop = () => {
+  const handleStop = async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
+    }
+    try {
+      await fetch("/api/generate/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id })
+      });
+      // Set generating false immediately for optimistic UI
       setIsGenerating(false);
-      setStatus("ready");
+    } catch (err: any) {
+      setError("Unable to stop this generation. Please try again.");
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!prompt.trim() || isGenerating) return;
+  const handleDeploy = async () => {
+    try {
+      const res = await fetch("/api/deploy", { method: "POST" });
+      if (!res.ok) {
+        const errTxt = await res.text();
+        setError(errTxt);
+      }
+    } catch (err: any) {
+      setError("Deploy error. Please try again.");
+    }
+  };
 
-    const userPrompt = prompt.trim();
-    setPrompt("");
+  const handleRegenerate = async () => {
+    await handleSubmit(undefined, true);
+  };
+
+  const handleSubmit = async (e?: React.FormEvent, regenerate = false) => {
+    if (e) e.preventDefault();
+    
+    // Only block empty prompt if not regenerating (regenerating might use existing state, actually user must enter a prompt unless we reuse the old one, but wait, the API requires a prompt).
+    // The user instruction: "Regenerate... use project's current selected provider/model... trigger existing Inngest workflow"
+    // Wait, in regenerate, should we just use the original prompt?
+    // Let's pass `prompt` if it exists, otherwise `project.description` or the last message content.
+    const userPrompt = prompt.trim() || messages[messages.length - 2]?.content || "Regenerate project";
+    
+    if (!regenerate && (!prompt.trim() || isGenerating)) return;
+
+    if (!regenerate) setPrompt("");
     setError(null);
     setStatus("generating");
     setIsGenerating(true);
 
-    const newMessages = [...messages, { role: "user", content: userPrompt }];
-    setMessages(newMessages);
-
-    // Add empty assistant message to stream into
-    setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+    if (!regenerate) {
+      const newMessages = [...messages, { role: "user", content: userPrompt }];
+      setMessages(newMessages);
+      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+    } else {
+      setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+    }
 
     abortControllerRef.current = new AbortController();
 
     try {
+      const payload: any = {
+        projectId: project.id,
+        prompt: userPrompt,
+        regenerate
+      };
+      
+      if (attachment) {
+        payload.attachmentId = attachment.id;
+      }
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectId: project.id,
-          prompt: userPrompt
-        }),
+        body: JSON.stringify(payload),
         signal: abortControllerRef.current.signal
       });
 
@@ -131,6 +255,9 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
         let errText = await res.text();
         throw new Error(errText);
       }
+
+      // Clear attachment after successful send
+      setAttachment(null);
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder("utf-8");
@@ -231,7 +358,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
             )}
           </div>
           
-          <Button variant="secondary" size="sm" className="gap-xs hidden sm:flex" disabled={displayStatus === "generating"} onClick={() => handleSubmit()}>
+          <Button variant="secondary" size="sm" className="gap-xs hidden sm:flex" disabled={displayStatus === "generating"} onClick={handleRegenerate}>
             <span className="material-symbols-outlined text-[16px]">refresh</span>
             Regenerate
           </Button>
@@ -239,7 +366,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
             <span className="material-symbols-outlined text-[16px]">stop_circle</span>
             Stop
           </Button>
-          <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm">
+          <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" onClick={handleDeploy}>
             <span className="material-symbols-outlined text-[16px]">publish</span>
             Deploy
           </Button>
@@ -285,24 +412,38 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
 
           <div className="p-4 border-t border-outline-variant/20 bg-surface-container-low">
             <form onSubmit={handleSubmit} className="bg-surface-container-highest border border-outline-variant/30 rounded-xl p-2 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 transition-all shadow-inner">
+              {attachment && (
+                <div className="mb-2 px-2 py-1 bg-surface-container-highest border border-primary/20 rounded flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-primary">attachment</span>
+                    <span className="text-xs text-on-surface">{attachment.filename}</span>
+                  </div>
+                  <button type="button" onClick={() => setAttachment(null)} className="text-on-surface-variant hover:text-error">
+                    <span className="material-symbols-outlined text-[16px]">close</span>
+                  </button>
+                </div>
+              )}
               <textarea 
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={isGenerating}
+                disabled={isGenerating || isUploading}
                 className="w-full h-20 bg-transparent text-on-surface text-sm resize-none outline-none placeholder:text-on-surface-variant/40 p-2 disabled:opacity-50" 
-                placeholder={isGenerating ? "Generating..." : "Message AI..."}
+                placeholder={isGenerating ? "Generating..." : isRecording ? "Listening..." : "Message AI..."}
               ></textarea>
               <div className="flex items-center justify-between mt-1 pt-1 border-t border-outline-variant/10">
                 <div className="flex items-center gap-1">
-                  <button type="button" className="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded disabled:opacity-50" disabled={isGenerating} title="Attach context">
-                    <span className="material-symbols-outlined text-[18px]">attach_file</span>
+                  <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept=".pdf,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp" />
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded disabled:opacity-50" disabled={isGenerating || isUploading} title="Attach context">
+                    <span className="material-symbols-outlined text-[18px]">
+                      {isUploading ? "sync" : "attach_file"}
+                    </span>
                   </button>
-                  <button type="button" className="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded disabled:opacity-50" disabled={isGenerating} title="Use Voice">
+                  <button type="button" onClick={toggleRecording} className={`text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded disabled:opacity-50 ${isRecording ? 'text-error hover:text-error' : ''}`} disabled={isGenerating} title="Use Voice">
                     <span className="material-symbols-outlined text-[18px]">mic</span>
                   </button>
                 </div>
-                <Button type="submit" size="sm" disabled={isGenerating || !prompt.trim()} className="!px-3 !py-1 h-auto text-xs">
+                <Button type="submit" size="sm" disabled={isGenerating || isUploading || (!prompt.trim() && !attachment)} className="!px-3 !py-1 h-auto text-xs">
                   {isGenerating ? (
                     <span className="material-symbols-outlined text-[14px] animate-spin">sync</span>
                   ) : (

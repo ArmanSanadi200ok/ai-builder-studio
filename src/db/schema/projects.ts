@@ -10,7 +10,7 @@ export const projects = pgTable("project", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status", { enum: ["draft", "queued", "generating", "validating", "ready", "deploying", "deployed", "failed"] }).notNull().default("draft"),
+  status: text("status", { enum: ["draft", "queued", "generating", "validating", "ready", "deploying", "deployed", "failed", "cancelled"] }).notNull().default("draft"),
   selectedProvider: text("selectedProvider"),
   selectedModel: text("selectedModel"),
   activeProvider: text("activeProvider"),
@@ -84,4 +84,21 @@ export const projectJobs = pgTable("project_job", {
   completedAt: timestamp("completedAt", { mode: "date" }),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const projectAttachments = pgTable("project_attachment", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  projectId: text("projectId")
+    .notNull()
+    .references(() => projects.id, { onDelete: "cascade" }),
+  messageId: text("messageId")
+    .references(() => projectMessages.id, { onDelete: "set null" }),
+  filename: text("filename").notNull(),
+  mimeType: text("mimeType").notNull(),
+  size: integer("size").notNull(),
+  storageRef: text("storageRef").notNull(),
+  extractedText: text("extractedText"),
+  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
 });
