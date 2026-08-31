@@ -34,7 +34,7 @@ async function getDecryptedKey(providerId: string, userId: string): Promise<stri
   }
 }
 
-async function makeProviderRequest(providerId: string, modelId: string, apiKey: string, systemPrompt: string, isJson: boolean = false) {
+async function makeProviderRequest(providerId: string, modelId: string, apiKey: string, userPrompt: string, isJson: boolean = false) {
   let baseUrl = "https://api.openai.com/v1";
   if (providerId === "groq") baseUrl = "https://api.groq.com/openai/v1";
   else if (providerId === "openrouter") baseUrl = "https://openrouter.ai/api/v1";
@@ -48,9 +48,11 @@ async function makeProviderRequest(providerId: string, modelId: string, apiKey: 
 
   const payload: any = {
     model: modelId,
-    messages: [{ role: "system", content: systemPrompt }],
+    messages: [{ role: "user", content: userPrompt }],
   };
   
+  console.log(`[Dispatch] Role Sequence: [${payload.messages.map((m: any) => `'${m.role}'`).join(", ")}]`);
+
   if (isJson) {
     payload.response_format = { type: "json_object" };
   }

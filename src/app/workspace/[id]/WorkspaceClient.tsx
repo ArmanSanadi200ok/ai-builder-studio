@@ -156,7 +156,11 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
             } else if (data.job.status === "FAILED") {
               setStatus("failed");
               setIsGenerating(false);
-              setError(data.job.errorMessage || "Generation failed.");
+              let msg = data.job.errorMessage || "Generation failed.";
+              if (msg.includes("400") || msg.toLowerCase().includes("bad request")) {
+                msg = "Generation failed: The conversation sequence became unsynchronized. Please try sending your prompt again.";
+              }
+              setError(msg);
             }
           }
         }
@@ -297,7 +301,11 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
     } catch (err: any) {
       if (err.name !== "AbortError") {
         console.error("Generation error:", err);
-        setError(err.message || "An error occurred during generation");
+        let errorMsg = err.message || "An error occurred during generation";
+        if (errorMsg.includes("400") || errorMsg.toLowerCase().includes("bad request")) {
+          errorMsg = "Generation failed: The conversation sequence became unsynchronized. Please try sending your prompt again.";
+        }
+        setError(errorMsg);
         setStatus("ready");
       }
     } finally {

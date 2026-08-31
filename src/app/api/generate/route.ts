@@ -162,6 +162,8 @@ Your job is to help the user build and modify this specific project. Respond in 
       ...serverHistory,
       { role: "user", content: prompt }
     ];
+    
+    console.log(`[Dispatch] Role Sequence: [${messages.map((m: any) => `'${m.role}'`).join(", ")}]`);
 
     const payload = {
       model: modelId,
