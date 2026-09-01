@@ -6,6 +6,7 @@ export interface ProviderModel {
   contextWindow?: number;
   isFree?: boolean;
   isAvailable: boolean;
+  supportsResponseFormat?: boolean;
 }
 
 export interface AIProviderConfig {
@@ -81,6 +82,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
           name: m.id,
           provider: "openai",
           isAvailable: true,
+          supportsResponseFormat: true,
         })).filter((m: any) => m.id.includes("gpt"));
       } catch { return []; }
     }
@@ -164,6 +166,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
             name: m.id,
             provider: "groq",
             isAvailable: true,
+            supportsResponseFormat: true,
           }));
       } catch { return []; }
     },
@@ -186,6 +189,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
           provider: "openrouter",
           isFree: m.pricing?.prompt === "0" && m.pricing?.completion === "0",
           isAvailable: true,
+          supportsResponseFormat: m.supported_parameters?.includes("response_format") || false,
         }));
       } catch { return []; }
     },
@@ -207,6 +211,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
           name: m.id,
           provider: "deepseek",
           isAvailable: true,
+          supportsResponseFormat: true,
         }));
       } catch { return []; }
     }
@@ -228,6 +233,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
           name: m.id,
           provider: "mistral",
           isAvailable: true,
+          supportsResponseFormat: true,
         }));
       } catch { return []; }
     }

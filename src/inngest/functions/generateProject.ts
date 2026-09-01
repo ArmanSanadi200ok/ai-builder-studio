@@ -34,7 +34,7 @@ async function getDecryptedKey(providerId: string, userId: string): Promise<stri
   }
 }
 
-async function makeProviderRequest(providerId: string, modelId: string, apiKey: string, userPrompt: string, isJson: boolean = false) {
+async function makeProviderRequest(providerId: string, modelId: string, apiKey: string, userPrompt: string, isJson: boolean = false, supportsResponseFormat: boolean = true) {
   let baseUrl = "https://api.openai.com/v1";
   if (providerId === "groq") baseUrl = "https://api.groq.com/openai/v1";
   else if (providerId === "openrouter") baseUrl = "https://openrouter.ai/api/v1";
@@ -53,7 +53,7 @@ async function makeProviderRequest(providerId: string, modelId: string, apiKey: 
   
   console.log(`[Dispatch] Role Sequence: [${payload.messages.map((m: any) => `'${m.role}'`).join(", ")}]`);
 
-  if (isJson) {
+  if (isJson && supportsResponseFormat) {
     payload.response_format = { type: "json_object" };
   }
 
@@ -142,11 +142,34 @@ async function executeWithProviderChain(
           activeModel: modelId
         }).where(eq(projects.id, projectId));
 
-        let content = await makeProviderRequest(providerId, modelId, apiKey as string, prompt, isJson);
+        // Re-resolve capabilities for live model
+        let liveModels: ProviderModel[] = [];
+        try {
+          liveModels = await getLiveModels(providerId, apiKey as string);
+        } catch (e) {}
+        const modelInfo = liveModels.find(m => m.id === modelId);
+        const supportsResponseFormat = modelInfo?.supportsResponseFormat !== false;
+
+        let content = await makeProviderRequest(providerId, modelId, apiKey as string, prompt, isJson, supportsResponseFormat);
         
         if (isJson) {
+           if (content !== null && content !== undefined) {
+             const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+             if (jsonMatch) {
+               content = jsonMatch[1].trim();
+             } else {
+               const braceMatch = content.match(/(\{|\[)[\s\S]*(\}|\])/);
+               if (braceMatch) {
+                 content = braceMatch[0];
+               }
+             }
+           }
+           
            try {
-             JSON.parse(content);
+             const parsed = JSON.parse(content);
+             if (parsed === null || typeof parsed !== 'object') {
+               throw new Error("Parsed JSON was not an object");
+             }
            } catch (e: any) {
              throw { message: `Malformed JSON: ${e.message}`, status: 400, code: "malformed_json" };
            }
@@ -218,10 +241,23 @@ async function executeWithProviderChain(
         }
         
         if (status === 400) {
-           // Not a model error, malformed request etc. Do not fallback models.
-           record.result = "failed";
-           attemptHistory.push(record);
-           throw new NonRetriableError(`Irrecoverable 400 Bad Request: ${msg}`);
+           if (code === "malformed_json") {
+             if (attempt < 2) {
+               attemptHistory.push(record);
+               await new Promise(r => setTimeout(r, 2000 * attempt));
+               continue;
+             } else {
+               record.result = "fallback";
+               attemptHistory.push(record);
+               providerExhausted = true;
+               break;
+             }
+           } else {
+             // Not a model error, malformed request etc. Do not fallback models.
+             record.result = "failed";
+             attemptHistory.push(record);
+             throw new NonRetriableError(`Irrecoverable 400 Bad Request: ${msg}`);
+           }
         }
 
         if (status === 408 || status === 429 || status >= 500) {
