@@ -598,11 +598,22 @@ Output JSON format exactly like this (no markdown wrapping):
           where: eq(projectFiles.versionId, versionId)
         });
         
-        const requiredStatic = ["index.html"];
-        const requiredReact = ["package.json", "index.html", "src/main.tsx", "src/App.tsx"];
-        const required = plan.plan.projectType === "react" ? requiredReact : requiredStatic;
+        const hasReactFiles = files.some(f => f.path.endsWith('.tsx') || f.path.endsWith('.jsx') || f.content.includes("react"));
+        const isReact = plan.plan.projectType === "react" || hasReactFiles;
         
-        const missing = required.filter(p => !files.find(f => f.path.toLowerCase() === p.toLowerCase()));
+        let missing: string[] = [];
+        if (isReact) {
+          const hasPackageJson = files.find(f => f.path.toLowerCase() === "package.json");
+          const hasMain = files.find(f => f.path.toLowerCase().match(/(src\/)?(main|index)\.(tsx|jsx|ts|js)$/));
+          const hasApp = files.find(f => f.path.toLowerCase().match(/(src\/)?app\.(tsx|jsx|ts|js)$/));
+          if (!hasPackageJson) missing.push("package.json");
+          if (!hasMain) missing.push("src/main.tsx (or equivalent entry point)");
+          if (!hasApp) missing.push("src/App.tsx (or equivalent root component)");
+        } else {
+          const hasIndexHtml = files.find(f => f.path.toLowerCase() === "index.html");
+          if (!hasIndexHtml) missing.push("index.html");
+        }
+        
         if (missing.length > 0) {
            await db.update(projectJobs).set({ status: "GENERATED_WITH_ERRORS", errorMessage: `Missing required files: ${missing.join(", ")}` }).where(eq(projectJobs.id, job.id));
            await db.update(projects).set({ status: "generated_with_errors" }).where(eq(projects.id, projectId));

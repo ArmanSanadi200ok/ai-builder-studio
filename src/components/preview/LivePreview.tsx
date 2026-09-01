@@ -89,16 +89,19 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
     Object.defineProperty(window, 'sessionStorage', { value: storageMock, writable: true });
   `;
 
-  if (hasReact && !indexHtml) {
-    const appFile = files.find(f => f.path.toLowerCase().includes("app.tsx") || f.path.toLowerCase().includes("app.jsx") || f.path.toLowerCase().includes("main.tsx"));
+  if (hasReact) {
+    const mainFile = files.find(f => f.path.toLowerCase().match(/(main|index)\.(tsx|jsx|ts|js)$/));
+    const appFile = files.find(f => f !== mainFile && f.path.toLowerCase().match(/app\.(tsx|jsx|ts|js)$/));
     
-    // We concatenate files, putting the 'app' file last.
-    const componentCode = otherFiles.filter(f => f !== appFile).map(f => f.content).join("\n\n");
+    // We concatenate files, putting the 'app' file and then the 'main' file last.
+    const remainingFiles = otherFiles.filter(f => f !== appFile && f !== mainFile);
+    const componentCode = remainingFiles.map(f => f.content).join("\n\n");
     const appCode = appFile ? appFile.content : "";
+    const mainCode = mainFile ? mainFile.content : "";
     
-    let allCode = componentCode + "\n\n" + appCode;
-    // Strip local relative imports since we are concatenating
-    allCode = allCode.replace(/import\s+.*?\s+from\s+['"]\.[^'"]+['"];?/g, '');
+    let allCode = componentCode + "\n\n" + appCode + "\n\n" + mainCode;
+    // Strip local relative imports (including multiline) since we are concatenating
+    allCode = allCode.replace(/import\s+[\s\S]*?\s+from\s+['"]\.[^'"]+['"];?/g, '');
     // Strip raw css imports
     allCode = allCode.replace(/import\s+['"][^'"]+\.css['"];?/g, '');
     
