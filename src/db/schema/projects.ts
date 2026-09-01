@@ -10,7 +10,7 @@ export const projects = pgTable("project", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status", { enum: ["draft", "queued", "generating", "validating", "ready", "deploying", "deployed", "failed", "cancelled"] }).notNull().default("draft"),
+  status: text("status", { enum: ["draft", "queued", "generating", "validating", "ready", "deploying", "deployed", "failed", "cancelled", "generated_with_errors"] }).notNull().default("draft"),
   selectedProvider: text("selectedProvider"),
   selectedModel: text("selectedModel"),
   activeProvider: text("activeProvider"),
@@ -72,7 +72,7 @@ export const projectJobs = pgTable("project_job", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   initialPrompt: text("initialPrompt").notNull(),
-  status: text("status", { enum: ["QUEUED", "PLANNING", "GENERATING", "VALIDATING", "BUILDING", "COMPLETED", "FAILED", "CANCELLED"] }).notNull().default("QUEUED"),
+  status: text("status", { enum: ["QUEUED", "PLANNING", "GENERATING", "VALIDATING", "BUILDING", "COMPLETED", "FAILED", "CANCELLED", "GENERATED_WITH_ERRORS"] }).notNull().default("QUEUED"),
   currentStep: text("currentStep"),
   selectedProvider: text("selectedProvider"),
   selectedModel: text("selectedModel"),

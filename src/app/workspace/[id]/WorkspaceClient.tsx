@@ -136,9 +136,9 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   const providerName = providerInfo?.name || activeProvider || "Unknown";
   
   // Job affects active status
-  const isActiveJob = jobState && !["COMPLETED", "FAILED", "CANCELLED"].includes(jobState.status);
+  const isActiveJob = jobState && !["COMPLETED", "FAILED", "CANCELLED", "GENERATED_WITH_ERRORS"].includes(jobState.status);
   const displayStatus = isActiveJob ? "generating" : status;
-  const statusColor = displayStatus === "ready" || displayStatus === "deployed" ? "#00a2e6" : "#6b7280";
+  const statusColor = (displayStatus === "ready" || displayStatus === "deployed" || displayStatus === "generated_with_errors") ? "#00a2e6" : "#6b7280";
 
   // Polling logic
   useEffect(() => {
@@ -171,6 +171,18 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
                 msg = "Generation failed: The conversation sequence became unsynchronized. Please try sending your prompt again.";
               }
               setError(msg);
+            } else if (data.job.status === "GENERATED_WITH_ERRORS") {
+              setStatus("generated_with_errors");
+              setIsGenerating(false);
+              
+              fetch(`/api/projects/${project.id}/files`)
+                .then(r => r.json())
+                .then(d => {
+                  if (d.files) setFiles(d.files);
+                })
+                .catch(console.error);
+                
+              setError(data.job.errorMessage || "Generated with syntax errors. You can try regenerating.");
             }
           }
         }
@@ -361,7 +373,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
         <div className="flex items-center gap-sm">
           <div className="hidden md:flex flex-col gap-0 mr-4 border-r border-outline-variant/20 pr-4">
             <span className="font-label-caps text-[10px] text-on-surface-variant uppercase text-right">
-              {isActiveJob ? "Running:" : displayStatus === "ready" ? "Generated Using:" : "Requested:"}
+              {isActiveJob ? "Running:" : (displayStatus === "ready" || displayStatus === "generated_with_errors") ? "Generated Using:" : "Requested:"}
             </span>
             <div className="flex items-center gap-1.5 text-primary font-body-sm justify-end">
               <span className="material-symbols-outlined text-[14px]">
@@ -384,7 +396,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
             <span className="material-symbols-outlined text-[16px]">stop_circle</span>
             Stop
           </Button>
-          <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" onClick={handleDeploy}>
+          <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" disabled={displayStatus === "generated_with_errors"} onClick={handleDeploy}>
             <span className="material-symbols-outlined text-[16px]">publish</span>
             Deploy
           </Button>
@@ -480,7 +492,8 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               <span className="font-label-caps text-label-caps text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded">Preview</span>
               <span className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2">
                 {status === "draft" ? "Ready to start building" : 
-                 status === "generating" ? "Generating..." : "Ready"}
+                 status === "generating" ? "Generating..." : 
+                 status === "generated_with_errors" ? "Generated with errors" : "Ready"}
               </span>
             </div>
             <div className="flex gap-2">

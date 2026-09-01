@@ -403,12 +403,24 @@ export const generateProject = inngest.createFunction(
           }
         }
 
-        const systemPrompt = "You are an expert software architect.\n" +
-"Create a file structure and implementation plan for the following project:\n" + prompt + contextText + "\n" +
-"Respond in valid JSON format: { \"files\": [ { \"path\": \"path/to/file.ts\", \"description\": \"What this file does\" } ] }\n" +
-"Ensure you only output valid JSON without markdown wrapping.";
+        const systemPrompt = `You are an expert software architect.
+Create a file structure and implementation plan for the following project:
+${prompt}${contextText}
 
-        const { content } = await executeWithProviderChain(
+You MUST choose one of the following two standard shapes for the project:
+1. Static shape (for simple/non-interactive requests like a "hello world" page):
+   Must include index.html, style.css, script.js (or index.html + inline).
+2. React shape (for requests implying interactivity/state/multiple views/components, like a todo app):
+   Must include package.json, index.html, src/main.tsx, src/App.tsx, src/index.css, and any necessary src/components/*.
+
+Output JSON format exactly like this (no markdown wrapping):
+{
+  "projectType": "static" | "react",
+  "framework": "none" | "react",
+  "files": [ { "path": "path/to/file", "description": "What this file does" } ]
+}`;
+
+        const { content, providerId, modelId } = await executeWithProviderChain(
            job.id,
            projectId,
            providerChain,
@@ -418,8 +430,19 @@ export const generateProject = inngest.createFunction(
            "Analyzing requirements",
            "planning"
         );
-        const parsedPlan = JSON.parse(content);
-        return { files: parsedPlan.files, contextText };
+        let parsedPlan: any = {};
+        try {
+           parsedPlan = JSON.parse(content);
+        } catch (e) {
+           parsedPlan = { projectType: "static", framework: "none", files: [] };
+        }
+        
+        await db.update(projects).set({ 
+          activeProvider: providerId, 
+          activeModel: modelId 
+        }).where(eq(projects.id, projectId));
+
+        return { plan: parsedPlan, contextText };
       });
 
       // 3. Initialize Version for Files
@@ -441,8 +464,8 @@ export const generateProject = inngest.createFunction(
       });
 
       // 4. Generating Files with Fallback & Upsert
-      const filesToGenerate = plan.files;
-      const generatedFiles: { path: string }[] = [];
+      const filesToGenerate = plan.plan.files || [];
+      const generatedFiles: { path: string; error?: string }[] = [];
       
       for (let i = 0; i < filesToGenerate.length; i++) {
         const file = filesToGenerate[i];
@@ -462,17 +485,57 @@ export const generateProject = inngest.createFunction(
              filePrompt += "\nEnsure the output is strictly valid JSON format.";
           }
 
-          const { content } = await executeWithProviderChain(
-             job.id,
-             projectId,
-             providerChain,
-             userId,
-             filePrompt,
-             isJsonFormat,
-             `Generating ${file.path} (${i + 1}/${filesToGenerate.length})`,
-             "execution",
-             file.path
-          );
+          let attempt = 0;
+          let finalContent = "";
+          let syntaxErrorMsg = "";
+          
+          while (attempt < 2) {
+            let attemptPrompt = filePrompt;
+            if (attempt > 0) {
+              attemptPrompt += `\n\nYour previous code failed syntax validation with this error:\n${syntaxErrorMsg}\nPlease fix the syntax error and return the corrected raw code.`;
+            }
+
+            const { content } = await executeWithProviderChain(
+               job.id,
+               projectId,
+               providerChain,
+               userId,
+               attemptPrompt,
+               isJsonFormat,
+               `Generating ${file.path} (${i + 1}/${filesToGenerate.length}) ${attempt > 0 ? '[Repairing]' : ''}`,
+               "execution",
+               file.path
+            );
+            
+            finalContent = content;
+            syntaxErrorMsg = "";
+
+            if (!isJsonFormat && (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx'))) {
+              const ts = require('typescript');
+              try {
+                // If it parses and transpiles without throwing an error, syntax is roughly okay
+                // transpileModule doesn't throw on all syntax errors (it emits diagnostics), so we check diagnostics
+                const result = ts.transpileModule(content, {
+                   compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 },
+                   reportDiagnostics: true
+                });
+                
+                const errors = result.diagnostics?.filter((d: any) => d.category === ts.DiagnosticCategory.Error);
+                if (errors && errors.length > 0) {
+                   const msg = ts.flattenDiagnosticMessageText(errors[0].messageText, '\n');
+                   throw new Error(msg);
+                }
+                
+                break; // Valid syntax
+              } catch (err: any) {
+                syntaxErrorMsg = err.message;
+              }
+            } else {
+              break; // Not a ts/js file
+            }
+            
+            attempt++;
+          }
           
           // UPSERT logic inside the step
           const existingFile = await db.query.projectFiles.findFirst({
@@ -480,25 +543,53 @@ export const generateProject = inngest.createFunction(
           });
           
           if (existingFile) {
-            await db.update(projectFiles).set({ content }).where(eq(projectFiles.id, existingFile.id));
+            await db.update(projectFiles).set({ content: finalContent }).where(eq(projectFiles.id, existingFile.id));
           } else {
-            await db.insert(projectFiles).values({ versionId, path: file.path, content });
+            await db.insert(projectFiles).values({ versionId, path: file.path, content: finalContent });
           }
           
-          return { path: file.path };
+          return { path: file.path, error: syntaxErrorMsg };
         });
         
         generatedFiles.push(fileResult);
       }
 
-      // 5. Completion
-      await step.run("completion", async () => {
+      // 5. Validation
+      await step.run("validate-project", async () => {
+        await db.update(projectJobs).set({ status: "VALIDATING", currentStep: "Validating generated files" }).where(eq(projectJobs.id, job.id));
+        
+        const files = await db.query.projectFiles.findMany({
+          where: eq(projectFiles.versionId, versionId)
+        });
+        
+        const requiredStatic = ["index.html"];
+        const requiredReact = ["package.json", "index.html", "src/main.tsx", "src/App.tsx"];
+        const required = plan.plan.projectType === "react" ? requiredReact : requiredStatic;
+        
+        const missing = required.filter(p => !files.find(f => f.path.toLowerCase() === p.toLowerCase()));
+        if (missing.length > 0) {
+           await db.update(projectJobs).set({ status: "GENERATED_WITH_ERRORS", errorMessage: `Missing required files: ${missing.join(", ")}` }).where(eq(projectJobs.id, job.id));
+           await db.update(projects).set({ status: "generated_with_errors" }).where(eq(projects.id, projectId));
+           return;
+        }
+
+        const hasSyntaxErrors = generatedFiles.some(f => f.error);
+        if (hasSyntaxErrors) {
+           const errFiles = generatedFiles.filter(f => f.error).map(f => f.path).join(', ');
+           await db.update(projectJobs).set({ status: "GENERATED_WITH_ERRORS", errorMessage: `Syntax errors remain in: ${errFiles}` }).where(eq(projectJobs.id, job.id));
+           await db.update(projects).set({ status: "generated_with_errors" }).where(eq(projects.id, projectId));
+           return;
+        }
+
         await db.update(projectJobs).set({
           status: "COMPLETED",
           currentStep: "Project generated successfully",
           completedAt: new Date(),
         }).where(eq(projectJobs.id, job.id));
         await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
+      });
+      
+      await step.run("completion-message", async () => {
         
         const fileList = generatedFiles.map((f: any) => "- " + f.path).join("\n");
         await db.insert(projectMessages).values({
