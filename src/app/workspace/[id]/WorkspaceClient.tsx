@@ -5,6 +5,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 import { aiProviders } from "@/lib/ai/registry";
+import { LivePreview } from "@/components/preview/LivePreview";
 
 interface WorkspaceClientProps {
   project: {
@@ -153,6 +154,15 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
             if (data.job.status === "COMPLETED") {
               setStatus("ready");
               setIsGenerating(false);
+              
+              // Fetch latest files
+              fetch(`/api/projects/${project.id}/files`)
+                .then(r => r.json())
+                .then(d => {
+                  if (d.files) setFiles(d.files);
+                })
+                .catch(console.error);
+                
             } else if (data.job.status === "FAILED") {
               setStatus("failed");
               setIsGenerating(false);
@@ -498,16 +508,9 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               </div>
             ) : (
               <div className="w-full max-w-[800px] bg-[#0f0f11] rounded-xl border border-outline-variant/20 shadow-2xl overflow-hidden flex flex-col min-h-[500px] ring-1 ring-white/5 relative">
-                <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white">
                   {files.length > 0 ? (
-                    <>
-                      <span className="material-symbols-outlined text-[48px] mb-4 text-[#00a2e6]">check_circle</span>
-                      <h2 className="font-headline-sm text-on-surface mb-2">Project Generated</h2>
-                      <p className="text-sm text-on-surface-variant max-w-md">
-                        {files.length} files were successfully generated for this project.
-                        Actual application preview rendering will be available soon.
-                      </p>
-                    </>
+                    <LivePreview files={files} />
                   ) : (
                     <p className="text-on-surface-variant/50">Preview rendering coming soon</p>
                   )}
