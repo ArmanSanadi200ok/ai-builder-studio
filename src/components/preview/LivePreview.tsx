@@ -9,6 +9,7 @@ interface LivePreviewProps {
 export function LivePreview({ files }: LivePreviewProps) {
   const [srcDoc, setSrcDoc] = useState("");
   const [previewState, setPreviewState] = useState<"building" | "ready" | "failed">("building");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setPreviewState("building");
@@ -20,6 +21,10 @@ export function LivePreview({ files }: LivePreviewProps) {
     const handleMessage = (e: MessageEvent) => {
       if (e.data === "preview-ready") {
         setPreviewState("ready");
+        clearTimeout(timer);
+      } else if (e.data && e.data.type === "preview-error") {
+        setPreviewState("failed");
+        setErrorMessage(e.data.message || "An unknown error occurred in the preview.");
         clearTimeout(timer);
       }
     };
@@ -50,8 +55,8 @@ export function LivePreview({ files }: LivePreviewProps) {
            <div className="flex flex-col items-center">
              <span className="material-symbols-outlined text-[48px] text-error mb-4">error</span>
              <p className="text-on-surface-variant font-mono text-sm">Preview Build Failed</p>
-             <p className="text-xs text-on-surface-variant/70 mt-2 max-w-xs text-center">
-               The generated code may contain infinite loops, syntax errors, or unresolvable imports.
+             <p className="text-xs text-on-surface-variant/70 mt-2 max-w-xs text-center break-words px-4">
+               {errorMessage || "The generated code may contain infinite loops, syntax errors, or unresolvable imports."}
              </p>
            </div>
          </div>
@@ -90,79 +95,121 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
   `;
 
   if (hasReact) {
-    const mainFile = files.find(f => f.path.toLowerCase().match(/(main|index)\.(tsx|jsx|ts|js)$/));
-    const appFile = files.find(f => f !== mainFile && f.path.toLowerCase().match(/app\.(tsx|jsx|ts|js)$/));
-    
-    // We concatenate files, putting the 'app' file and then the 'main' file last.
-    const remainingFiles = otherFiles.filter(f => f !== appFile && f !== mainFile);
-    const componentCode = remainingFiles.map(f => f.content).join("\n\n");
-    const appCode = appFile ? appFile.content : "";
-    const mainCode = mainFile ? mainFile.content : "";
-    
-    let allCode = componentCode + "\n\n" + appCode + "\n\n" + mainCode;
-    // Strip local relative imports (including multiline) since we are concatenating
-    allCode = allCode.replace(/import\s+[\s\S]*?\s+from\s+['"]\.[^'"]+['"];?/g, '');
-    // Strip raw css imports
-    allCode = allCode.replace(/import\s+['"][^'"]+\.css['"];?/g, '');
-    
-    // If there's an export default App, we can grab it, but the easiest way is to let Babel evaluate it
-    // and just define a root render point at the bottom if it doesn't already exist.
-    const hasRenderCall = allCode.includes("createRoot") || allCode.includes("ReactDOM.render");
-    
-    let renderInject = "";
-    if (!hasRenderCall) {
-      renderInject = `
-        import { createRoot } from 'react-dom/client';
-        // Try to find what to render
-        let ComponentToRender = null;
-        if (typeof App !== 'undefined') ComponentToRender = App;
-        else if (typeof Main !== 'undefined') ComponentToRender = Main;
-        else if (typeof Default !== 'undefined') ComponentToRender = Default;
-        
-        if (ComponentToRender) {
-          const root = createRoot(document.getElementById('root'));
-          root.render(<ComponentToRender />);
+    const bootloaderScript = `
+      const files = ${JSON.stringify(otherFiles.map(f => ({
+        path: f.path,
+        content: f.content.replace(/import\\s+['"][^'"]+\\.css['"];?/g, '')
+      })))};
+
+      const importMap = {
+        imports: {
+          "react": "https://esm.sh/react@18.2.0",
+          "react-dom": "https://esm.sh/react-dom@18.2.0",
+          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+          "lucide-react": "https://esm.sh/lucide-react@0.294.0"
         }
-      `;
-      // Replace export default with const
-      allCode = allCode.replace(/export\s+default\s+(function\s+)?([A-Za-z0-9_]+)/g, 'const $2 = $1');
-      allCode = allCode.replace(/export\s+default\s+([A-Za-z0-9_]+);?/g, '');
-      // Remove other exports so Babel doesn't complain about exports in a script
-      allCode = allCode.replace(/export\s+const/g, 'const');
-      allCode = allCode.replace(/export\s+function/g, 'function');
-    } else {
-       // Just strip exports
-       allCode = allCode.replace(/export\s+default/g, '');
-       allCode = allCode.replace(/export\s+/g, '');
-    }
+      };
+
+      window.onload = () => {
+        try {
+          function resolveRelativePath(basePath, relativePath) {
+            const parts = basePath.split('/');
+            parts.pop();
+            const relParts = relativePath.split('/');
+            for (const part of relParts) {
+              if (part === '.') continue;
+              if (part === '..') parts.pop();
+              else parts.push(part);
+            }
+            return parts.join('/');
+          }
+
+          const rewriteImportsPlugin = function() {
+            return {
+              visitor: {
+                ImportDeclaration(path, state) {
+                  const source = path.node.source.value;
+                  if (source.startsWith('.')) {
+                    let resolvedPath = resolveRelativePath(state.filename, source);
+                    if (resolvedPath.startsWith('./')) resolvedPath = resolvedPath.substring(2);
+                    if (resolvedPath.startsWith('/')) resolvedPath = resolvedPath.substring(1);
+                    path.node.source.value = '@local/' + resolvedPath;
+                  }
+                }
+              }
+            };
+          };
+          
+          Babel.registerPlugin('rewrite-imports', rewriteImportsPlugin);
+
+          let mainBlobUrl = null;
+
+          for (const file of files) {
+            const filename = file.path.startsWith('./') ? file.path.substring(2) : (file.path.startsWith('/') ? file.path.substring(1) : file.path);
+            
+            const transpiled = Babel.transform(file.content, { 
+              filename: filename,
+              presets: ['react', 'typescript'], 
+              plugins: ['rewrite-imports']
+            }).code;
+            
+            const blob = new Blob([transpiled], { type: 'text/javascript' });
+            const url = URL.createObjectURL(blob);
+            
+            const localPath = '@local/' + filename;
+            const extensionless = localPath.replace(/\\.[^/.]+$/, "");
+            
+            importMap.imports[localPath] = url;
+            importMap.imports[extensionless] = url;
+            
+            if (filename.match(/(src\\/)?(main|index)\\.(tsx|jsx|ts|js)$/)) {
+              mainBlobUrl = url;
+            }
+          }
+
+          const mapScript = document.createElement('script');
+          mapScript.type = 'importmap';
+          mapScript.textContent = JSON.stringify(importMap);
+          document.head.appendChild(mapScript);
+
+          if (mainBlobUrl) {
+            const modScript = document.createElement('script');
+            modScript.type = 'module';
+            modScript.src = mainBlobUrl;
+            document.body.appendChild(modScript);
+          } else {
+            throw new Error("No entry point (main.tsx or index.tsx) found");
+          }
+
+          window.parent.postMessage("preview-ready", "*");
+
+        } catch(err) {
+          window.parent.postMessage({ type: 'preview-error', message: err.message, stack: err.stack }, '*');
+        }
+      };
+    `;
 
     return `
 <!DOCTYPE html>
 <html>
 <head>
   <style>${cssContent}</style>
-  <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom": "https://esm.sh/react-dom@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.294.0"
-      }
-    }
-  </script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script>
     ${storageShim}
-    window.onload = () => { window.parent.postMessage("preview-ready", "*"); };
+    
+    window.onerror = function(message, source, lineno, colno, error) {
+      window.parent.postMessage({ type: 'preview-error', message: message, stack: error?.stack }, '*');
+    };
+    window.addEventListener('unhandledrejection', function(event) {
+      window.parent.postMessage({ type: 'preview-error', message: event.reason?.message || String(event.reason), stack: event.reason?.stack }, '*');
+    });
+    
+    ${bootloaderScript}
   </script>
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel" data-type="module">
-    ${allCode}
-    ${renderInject}
-  </script>
 </body>
 </html>
     `;

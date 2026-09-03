@@ -43,6 +43,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [jobState, setJobState] = useState(initialJob);
   const [attachment, setAttachment] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -246,6 +247,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
 
     if (!regenerate) setPrompt("");
     setError(null);
+    setErrorMessage(null);
     setStatus("generating");
     setIsGenerating(true);
 
