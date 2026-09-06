@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script>
+    const importMap = {
+      imports: {
+        "@local/src/App": "data:text/javascript,export default function App() { return 'App'; }"
+      }
+    };
+    const mapScript = document.createElement('script');
+    mapScript.type = 'importmap';
+    mapScript.textContent = JSON.stringify(importMap);
+    document.head.appendChild(mapScript);
+
+    const modScript = document.createElement('script');
+    modScript.type = 'module';
+    modScript.src = "data:text/javascript,import App from '@local/src/App'; console.log(App());";
+    document.body.appendChild(modScript);
+  </script>
+</head>
+<body>
+</body>
+</html>

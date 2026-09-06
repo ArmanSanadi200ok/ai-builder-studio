@@ -99,11 +99,12 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
       const files = ${JSON.stringify(otherFiles.map(f => ({
         path: f.path,
         content: f.content.replace(/import\\s+['"][^'"]+\\.css['"];?/g, '')
-      })))};
+      }))).replace(/</g, '\\\\u003c')};
 
       const importMap = {
         imports: {
           "react": "https://esm.sh/react@18.2.0",
+          "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
           "react-dom": "https://esm.sh/react-dom@18.2.0",
           "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
           "lucide-react": "https://esm.sh/lucide-react@0.294.0"
@@ -149,7 +150,7 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
             
             const transpiled = Babel.transform(file.content, { 
               filename: filename,
-              presets: ['react', 'typescript'], 
+              presets: [['react', { runtime: 'automatic' }], 'typescript'], 
               plugins: ['rewrite-imports']
             }).code;
             
@@ -189,14 +190,25 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
       };
     `;
 
-    return `
+    let baseHtml = indexHtml || `
 <!DOCTYPE html>
 <html>
 <head>
-  <style>${cssContent}</style>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>
+    `;
+    
+    // Strip original module scripts to prevent 404s in the opaque origin
+    baseHtml = baseHtml.replace(/<script\b[^>]*src=["'][^"']+\.(tsx|ts|jsx|js)["'][^>]*>.*?<\/script>/gi, '');
+
+    return baseHtml.replace('</head>', `
+  <style>\${cssContent}</style>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script>
-    ${storageShim}
+    \${storageShim}
     
     window.onerror = function(message, source, lineno, colno, error) {
       window.parent.postMessage({ type: 'preview-error', message: message, stack: error?.stack }, '*');
@@ -205,21 +217,16 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
       window.parent.postMessage({ type: 'preview-error', message: event.reason?.message || String(event.reason), stack: event.reason?.stack }, '*');
     });
     
-    ${bootloaderScript}
+    \${bootloaderScript}
   </script>
-</head>
-<body>
-  <div id="root"></div>
-</body>
-</html>
-    `;
+</head>`);
   }
   
   if (indexHtml) {
     return indexHtml.replace('</head>', `
-      <style>${cssContent}</style>
+      <style>\${cssContent}</style>
       <script>
-        ${storageShim}
+        \${storageShim}
         window.onload = () => { window.parent.postMessage("preview-ready", "*"); };
       </script>
     </head>
