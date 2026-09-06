@@ -98,8 +98,8 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
     const bootloaderScript = `
       const files = ${JSON.stringify(otherFiles.map(f => ({
         path: f.path,
-        content: f.content.replace(/import\\s+['"][^'"]+\\.css['"];?/g, '')
-      }))).replace(/</g, '\\\\u003c')};
+        content: f.content.replace(/^\s*import\s+.*\.css['"].*$/gm, '')
+      }))).replace(/</g, '\\u003c')};
 
       const importMap = {
         imports: {
@@ -177,15 +177,19 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
             const modScript = document.createElement('script');
             modScript.type = 'module';
             modScript.src = mainBlobUrl;
+            modScript.onload = function() {
+              window.parent.postMessage("preview-ready", "*");
+            };
+            modScript.onerror = function() {
+              showPreviewError('Module entry point failed to load or execute');
+            };
             document.body.appendChild(modScript);
           } else {
             throw new Error("No entry point (main.tsx or index.tsx) found");
           }
 
-          window.parent.postMessage("preview-ready", "*");
-
         } catch(err) {
-          window.parent.postMessage({ type: 'preview-error', message: err.message, stack: err.stack }, '*');
+          showPreviewError(err.message || String(err), err.stack);
         }
       };
     `;
@@ -205,28 +209,43 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
     baseHtml = baseHtml.replace(/<script\b[^>]*src=["'][^"']+\.(tsx|ts|jsx|js)["'][^>]*>.*?<\/script>/gi, '');
 
     return baseHtml.replace('</head>', `
-  <style>\${cssContent}</style>
+  <style>${cssContent}</style>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script>
-    \${storageShim}
+    ${storageShim}
     
+    function showPreviewError(msg, stack) {
+      var d = document.createElement('div');
+      d.style.cssText = 'font-family:monospace;padding:24px;color:#f87171;background:#18181b;min-height:100vh;box-sizing:border-box;overflow:auto;position:fixed;inset:0;z-index:99999';
+      var h = document.createElement('h3');
+      h.style.cssText = 'margin:0 0 12px;color:#fca5a5';
+      h.textContent = 'Preview Error';
+      var p = document.createElement('pre');
+      p.style.cssText = 'white-space:pre-wrap;word-break:break-word;color:#fca5a5;margin:0;font-size:13px';
+      p.textContent = String(msg) + (stack ? '\n\n' + stack : '');
+      d.appendChild(h);
+      d.appendChild(p);
+      var root = document.getElementById('root') || document.body;
+      if (root) { root.innerHTML = ''; root.appendChild(d); }
+      window.parent.postMessage({ type: 'preview-error', message: String(msg), stack: stack }, '*');
+    }
     window.onerror = function(message, source, lineno, colno, error) {
-      window.parent.postMessage({ type: 'preview-error', message: message, stack: error?.stack }, '*');
+      showPreviewError(message, error?.stack);
     };
     window.addEventListener('unhandledrejection', function(event) {
-      window.parent.postMessage({ type: 'preview-error', message: event.reason?.message || String(event.reason), stack: event.reason?.stack }, '*');
+      showPreviewError(event.reason?.message || String(event.reason), event.reason?.stack);
     });
     
-    \${bootloaderScript}
+    ${bootloaderScript}
   </script>
 </head>`);
   }
   
   if (indexHtml) {
     return indexHtml.replace('</head>', `
-      <style>\${cssContent}</style>
+      <style>${cssContent}</style>
       <script>
-        \${storageShim}
+        ${storageShim}
         window.onload = () => { window.parent.postMessage("preview-ready", "*"); };
       </script>
     </head>
