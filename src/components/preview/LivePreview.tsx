@@ -74,7 +74,7 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
   const indexHtml = files.find(f => f.path.toLowerCase() === "index.html" || f.path.toLowerCase() === "public/index.html")?.content;
   
   const cssFiles = files.filter(f => f.path.endsWith(".css"));
-  const cssContent = cssFiles.map(f => f.content).join("\n");
+  const cssContent = cssFiles.map(f => f.content).join("\n").replace(/<\/style>/gi, '');
 
   const otherFiles = files.filter(f => f.path.endsWith(".tsx") || f.path.endsWith(".ts") || f.path.endsWith(".js") || f.path.endsWith(".jsx"));
   const hasReact = files.some(f => f.path.endsWith(".tsx") || f.path.endsWith(".jsx") || f.content.includes("react"));
@@ -98,7 +98,7 @@ function generateSrcDoc(files: { path: string; content: string }[]) {
     const bootloaderScript = `
       const files = ${JSON.stringify(otherFiles.map(f => ({
         path: f.path,
-        content: f.content.replace(/^\s*import\s+.*\.css['"].*$/gm, '')
+        content: f.content.replace(/import\s+(?:['"][^'"]*\.css['"]|[\w,{}\s]+from\s+['"][^'"]*\.css['"])\s*;?/g, '')
       }))).replace(/</g, '\\u003c')};
 
       const importMap = {
