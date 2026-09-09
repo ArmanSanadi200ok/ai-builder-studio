@@ -49,6 +49,12 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   
+  const [previewState, setPreviewState] = useState<{status: string, url: string | null, error: string | null}>({
+    status: 'IDLE',
+    url: null,
+    error: null
+  });
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
 
@@ -156,11 +162,14 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               setStatus("ready");
               setIsGenerating(false);
               
-              // Fetch latest files
+              // Fetch latest files and trigger preview
               fetch(`/api/projects/${project.id}/files`)
                 .then(r => r.json())
-                .then(d => {
-                  if (d.files) setFiles(d.files);
+                .then(async d => {
+                  if (d.files) {
+                    setFiles(d.files);
+                    await fetch(`/api/projects/${project.id}/preview`, { method: "POST" });
+                  }
                 })
                 .catch(console.error);
                 
@@ -191,6 +200,35 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
     }, 2000);
     return () => clearInterval(interval);
   }, [isActiveJob, project.id]);
+
+  // Preview polling logic
+  useEffect(() => {
+    if (files.length === 0) return;
+    
+    const checkPreview = async () => {
+      try {
+        const res = await fetch(`/api/projects/${project.id}/preview`);
+        if (res.ok) {
+          const data = await res.json();
+          setPreviewState({
+            status: data.previewStatus || 'IDLE',
+            url: data.previewUrl || null,
+            error: data.previewError || null
+          });
+          
+          if (data.previewStatus === 'IDLE') {
+            await fetch(`/api/projects/${project.id}/preview`, { method: "POST" });
+          }
+        } else if (res.status === 404) {
+          // If api returns 404 project not found, ignore
+        }
+      } catch (err) {}
+    };
+
+    checkPreview();
+    const interval = setInterval(checkPreview, 3000);
+    return () => clearInterval(interval);
+  }, [files.length, project.id]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -525,7 +563,30 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               <div className="w-full max-w-[800px] bg-[#0f0f11] rounded-xl border border-outline-variant/20 shadow-2xl overflow-hidden flex flex-col min-h-[500px] ring-1 ring-white/5 relative">
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white">
                   {files.length > 0 ? (
-                    <LivePreview files={files} />
+                    previewState.status === "READY" && previewState.url ? (
+                      <iframe 
+                        src={previewState.url} 
+                        className="w-full h-full border-0 bg-white"
+                        sandbox="allow-forms allow-modals allow-pointer-lock allow-popups allow-same-origin allow-scripts allow-top-navigation-by-user-activation"
+                      />
+                    ) : previewState.status === "FAILED" ? (
+                      <div className="w-full h-full p-8 flex flex-col items-start justify-center bg-[#1e1e1e] text-red-400 font-mono text-sm overflow-y-auto whitespace-pre-wrap">
+                        <span className="text-white mb-4">Preview failed</span>
+                        {previewState.error}
+                        <Button className="mt-4" onClick={() => fetch(`/api/projects/${project.id}/preview`, { method: "POST" })}>Retry Preview</Button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-4 text-on-surface-variant">
+                        <span className="material-symbols-outlined text-[48px] animate-spin">sync</span>
+                        <p>
+                          {previewState.status === "CREATING_SANDBOX" && "Preparing preview environment..."}
+                          {previewState.status === "SYNCING_FILES" && "Syncing project files..."}
+                          {previewState.status === "INSTALLING" && "Installing dependencies..."}
+                          {previewState.status === "STARTING" && "Starting dev server..."}
+                          {previewState.status === "IDLE" && "Requesting preview..."}
+                        </p>
+                      </div>
+                    )
                   ) : (
                     <p className="text-on-surface-variant/50">Preview rendering coming soon</p>
                   )}

@@ -18,6 +18,13 @@ export const projects = pgTable("project", {
   githubRepoUrl: text("githubRepoUrl"),
   vercelDeployUrl: text("vercelDeployUrl"),
   vercelProjectId: text("vercelProjectId"),
+  previewStatus: text("previewStatus", { enum: ["IDLE", "CREATING_SANDBOX", "SYNCING_FILES", "INSTALLING", "STARTING", "READY", "FAILED", "STOPPED"] }).notNull().default("IDLE"),
+  sandboxId: text("sandboxId"),
+  sandboxName: text("sandboxName"),
+  previewUrl: text("previewUrl"),
+  previewPort: integer("previewPort"),
+  previewError: text("previewError"),
+  lastPreviewedAt: timestamp("lastPreviewedAt", { mode: "date" }),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
 });
