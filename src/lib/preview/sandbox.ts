@@ -29,10 +29,34 @@ export async function createOrResumeSandbox(projectId: string) {
 }
 
 export async function syncFilesToSandbox(sandbox: Sandbox, files: { path: string, content: string }[]) {
-  const sandboxFiles = files.map(file => ({
-    path: file.path.startsWith('/') ? file.path.substring(1) : file.path,
-    content: file.content
-  }));
+  const sandboxFiles = files.map(file => {
+    let content = file.content;
+    const pathLower = file.path.toLowerCase();
+    
+    // Inject allowedHosts for Vite to prevent 403 Forbidden on the preview URL
+    if (pathLower === "vite.config.js" || pathLower === "vite.config.ts") {
+      if (content.includes("defineConfig({")) {
+        content = content.replace("defineConfig({", "defineConfig({ server: { allowedHosts: true },");
+      } else if (content.includes("export default {")) {
+        content = content.replace("export default {", "export default { server: { allowedHosts: true },");
+      }
+    }
+    
+    return {
+      path: file.path.startsWith('/') ? file.path.substring(1) : file.path,
+      content
+    };
+  });
+  
+  // If Vite project and no config exists, add one
+  const hasViteConfig = sandboxFiles.some(f => f.path.toLowerCase() === 'vite.config.js' || f.path.toLowerCase() === 'vite.config.ts');
+  const isVite = files.some(f => f.path.toLowerCase() === 'package.json' && f.content.includes('"vite"'));
+  if (isVite && !hasViteConfig) {
+    sandboxFiles.push({
+      path: 'vite.config.js',
+      content: `export default { server: { allowedHosts: true } };`
+    });
+  }
   
   await sandbox.writeFiles(sandboxFiles);
   return sandboxFiles;

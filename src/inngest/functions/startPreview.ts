@@ -130,18 +130,53 @@ export const startPreviewSandbox = inngest.createFunction(
 
         const devCommand = getDevCommand(packageManager, framework, files);
         
-        // Background the dev server
-        await sandbox.runCommand("sh", ["-c", `nohup ${devCommand} > /workspace/server.log 2>&1 &`]);
+        // Use detached: true to keep the process alive in the sandbox properly
+        const devCmd = await sandbox.runCommand({
+          cmd: "sh",
+          args: ["-c", devCommand],
+          detached: true
+        });
         
-        // Wait briefly to ensure it starts
-        await new Promise(r => setTimeout(r, 2000));
-        
-        // Expose port
         const targetPort = framework === "vite" ? 5173 : 3000;
         
-        const previewUrl = await sandbox.domain(targetPort);
+        // We also need to explicitly ensure the sandbox has this port exposed 
+        // if not already done during creation, but getOrCreate exposes them.
+
+        let previewUrl = "";
+        let isReady = false;
+        let crashResult: any = null;
         
-        // Health check logic would go here (polling the url)
+        // Listen for early crashes
+        devCmd.wait().then((res: any) => { crashResult = res; }).catch(() => {});
+        
+        // Proper readiness check with retries
+        for (let i = 0; i < 30; i++) {
+          if (crashResult) {
+            const stdout = await devCmd.stdout().catch(() => "");
+            const stderr = await devCmd.stderr().catch(() => "");
+            throw new Error(`Dev server crashed (Exit ${crashResult.exitCode}):\n${stderr}\n${stdout}`);
+          }
+          
+          try {
+            previewUrl = await sandbox.domain(targetPort);
+            // Vercel Sandbox routing layer is ready. Let's do an HTTP health check.
+            const res = await fetch(previewUrl);
+            // 200 OK, 404 Not Found (app is running but no index), 403 Forbidden (Vite host check) all mean the server is ALIVE.
+            if (res.ok || res.status === 404 || res.status === 403) {
+              isReady = true;
+              break;
+            }
+          } catch (e) {
+            // Ignore fetch errors (ECONNREFUSED) or sandbox.domain throwing "No route for port"
+          }
+          await new Promise(r => setTimeout(r, 1000));
+        }
+        
+        if (!isReady) {
+          const stdout = await devCmd.stdout().catch(() => "");
+          const stderr = await devCmd.stderr().catch(() => "");
+          throw new Error(`Dev server failed to become ready on port ${targetPort}.\nLogs:\n${stderr}\n${stdout}`);
+        }
         
         await db.update(projects).set({ 
           previewStatus: "READY",
