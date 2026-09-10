@@ -74,9 +74,11 @@ async function run() {
   console.log("HTTP 200 OK!");
 
   console.log("=== D. Stop/reopen workspace (Simulate by closing connection) ===");
-  // Force kill the dev server behind the scenes to simulate a stopped server after some idle time
-  console.log("Force killing the dev server to simulate a dead process...");
-  await sandbox.runCommand({ cmd: "sh", args: ["-c", `kill -9 $(lsof -t -i:${targetPort}) 2>/dev/null || true`] });
+  // We use sandbox.stop() to actually suspend the persistent sandbox and its session
+  console.log("Stopping the sandbox session to simulate an idle or suspended workspace...");
+  await sandbox.stop();
+  // Wait a moment for it to fully stop
+  await new Promise(r => setTimeout(r, 2000));
 
   console.log("=== E. Sandbox is reused ===");
   const reusedSandbox = await Sandbox.getOrCreate({ name: sandboxName, ports: [3000, 5173], ...credentials });
