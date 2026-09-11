@@ -152,7 +152,10 @@ async function executeWithProviderChain(
 
         let content = await makeProviderRequest(providerId, modelId, apiKey as string, prompt, isJson, supportsResponseFormat);
         
+        console.log(`[Diagnostic] Provider: ${providerId} | Model: ${modelId} | Prompt Length: ${prompt.length} | Response Length: ${content ? content.length : 0}`);
+
         if (isJson) {
+           let rawContent = content;
            if (content !== null && content !== undefined) {
              const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
              if (jsonMatch) {
@@ -170,7 +173,9 @@ async function executeWithProviderChain(
              if (parsed === null || typeof parsed !== 'object') {
                throw new Error("Parsed JSON was not an object");
              }
+             console.log(`[Diagnostic] JSON Parse: SUCCESS`);
            } catch (e: any) {
+             console.log(`[Diagnostic] JSON Parse: FAILED | Reason: ${e.message}`);
              throw { message: `Malformed JSON: ${e.message}`, status: 400, code: "malformed_json" };
            }
         }
@@ -509,17 +514,15 @@ Output JSON format exactly like this (no markdown wrapping):
         const fileResult = await step.run(`generate-file-${i}`, async () => {
           await db.update(projectJobs).set({ status: "GENERATING", currentStep: `Generating ${file.path} (${i + 1}/${filesToGenerate.length})` }).where(eq(projectJobs.id, job.id));
           
-          let filePrompt = "You are implementing a project.\n" +
+          let filePrompt = "You are an expert developer implementing a project.\n" +
 "Project Request: " + prompt + (plan.contextText || "") + "\n" +
 "Your task is to write the complete content for the file: " + file.path + "\n" +
 "Description: " + file.description + "\n\n" +
-"Output ONLY the raw file content. Do not wrap it in markdown code blocks (```). No explanations.";
+"Output ONLY a valid JSON object with a single 'content' string property containing the raw file content.\n" +
+"Do NOT output markdown outside the JSON. Do NOT output chain-of-thought, thinking process, or conversational preamble.\n" +
+"Example JSON format:\n{\n  \"content\": \"raw file content goes here\"\n}";
 
-          let isJsonFormat = false;
-          if (file.path.endsWith('.json')) {
-             isJsonFormat = true;
-             filePrompt += "\nEnsure the output is strictly valid JSON format.";
-          }
+          let isJsonFormat = true; // Always force JSON output format
 
           let attempt = 0;
           let finalContent = "";
@@ -528,7 +531,7 @@ Output JSON format exactly like this (no markdown wrapping):
           while (attempt < 2) {
             let attemptPrompt = filePrompt;
             if (attempt > 0) {
-              attemptPrompt += `\n\nYour previous code failed syntax validation with this error:\n${syntaxErrorMsg}\nPlease fix the syntax error and return the corrected raw code.`;
+              attemptPrompt += `\n\nYour previous code failed validation with this error:\n${syntaxErrorMsg}\nPlease fix the error and return the corrected JSON.`;
             }
 
             const { content } = await executeWithProviderChain(
@@ -543,34 +546,71 @@ Output JSON format exactly like this (no markdown wrapping):
                file.path
             );
             
-            finalContent = content;
-            syntaxErrorMsg = "";
-
-            if (!isJsonFormat && (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx'))) {
-              const ts = require('typescript');
-              try {
-                // If it parses and transpiles without throwing an error, syntax is roughly okay
-                // transpileModule doesn't throw on all syntax errors (it emits diagnostics), so we check diagnostics
-                const result = ts.transpileModule(content, {
-                   compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 },
-                   reportDiagnostics: true
-                });
-                
-                const errors = result.diagnostics?.filter((d: any) => d.category === ts.DiagnosticCategory.Error);
-                if (errors && errors.length > 0) {
-                   const msg = ts.flattenDiagnosticMessageText(errors[0].messageText, '\n');
-                   throw new Error(msg);
-                }
-                
-                break; // Valid syntax
-              } catch (err: any) {
-                syntaxErrorMsg = err.message;
-              }
-            } else {
-              break; // Not a ts/js file
+            try {
+              const parsed = JSON.parse(content);
+              finalContent = parsed.content;
+              if (typeof finalContent !== "string") throw new Error("JSON 'content' property must be a string");
+              if (!finalContent.trim()) throw new Error("File content cannot be empty");
+            } catch (e: any) {
+              syntaxErrorMsg = "Failed to parse JSON response or missing 'content' property. " + e.message;
+              attempt++;
+              continue;
             }
             
-            attempt++;
+            syntaxErrorMsg = "";
+            const lowerContent = finalContent.toLowerCase();
+
+            // Sanity check conversational text
+            if (lowerContent.includes("here's a thinking process") || lowerContent.includes("here is a thinking process") || lowerContent.includes("sure, i can help") || lowerContent.startsWith("i will write") || lowerContent.startsWith("here is the")) {
+               syntaxErrorMsg = "Content appears to contain conversational AI preamble instead of raw source code.";
+            }
+
+            // File type heuristics
+            if (!syntaxErrorMsg) {
+              if (file.path.endsWith('.json') || file.path.toLowerCase() === 'package.json') {
+                try {
+                  JSON.parse(finalContent);
+                } catch (e) {
+                  syntaxErrorMsg = "Invalid JSON structure for a JSON file.";
+                }
+              } else if (file.path.endsWith('.html')) {
+                if (!lowerContent.includes("<html") && !lowerContent.includes("<div") && !lowerContent.includes("<body")) {
+                  syntaxErrorMsg = "HTML file does not contain valid HTML tags.";
+                }
+              } else if (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx')) {
+                const ts = require('typescript');
+                try {
+                  const result = ts.transpileModule(finalContent, {
+                     compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 },
+                     reportDiagnostics: true
+                  });
+                  const errors = result.diagnostics?.filter((d: any) => d.category === ts.DiagnosticCategory.Error);
+                  if (errors && errors.length > 0) {
+                     syntaxErrorMsg = ts.flattenDiagnosticMessageText(errors[0].messageText, '\n');
+                  }
+                } catch (err: any) {
+                  syntaxErrorMsg = err.message;
+                }
+              } else if (file.path.endsWith('.css') || file.path.endsWith('.scss') || file.path.endsWith('.less')) {
+                if (!lowerContent.includes("{") || !lowerContent.includes("}")) {
+                  syntaxErrorMsg = "CSS file does not contain valid style rules.";
+                }
+              } else if (file.path.match(/\.(config|rc)\.(js|ts|json|mjs|cjs)$/)) {
+                if (finalContent.length < 5) {
+                  syntaxErrorMsg = "Config file seems too short or empty.";
+                }
+              }
+            }
+            
+            if (syntaxErrorMsg) {
+              attempt++;
+            } else {
+              break; // Valid syntax
+            }
+          }
+          
+          if (syntaxErrorMsg) {
+            throw new Error(`Validation failed for ${file.path}: ${syntaxErrorMsg}`);
           }
           
           // UPSERT logic inside the step
