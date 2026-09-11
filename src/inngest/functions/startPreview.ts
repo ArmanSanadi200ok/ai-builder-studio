@@ -151,7 +151,7 @@ export const startPreviewSandbox = inngest.createFunction(
           // Kill any dead/zombie process bound to the target port
           await sandbox.runCommand({ cmd: "sh", args: ["-c", `kill -9 $(lsof -t -i:${targetPort}) 2>/dev/null || true`] });
           
-          const devCommand = getDevCommand(packageManager, framework, files);
+          const devCommand = getDevCommand(packageManager, framework, files, targetPort);
           
           devCmd = await sandbox.runCommand({
             cmd: "sh",

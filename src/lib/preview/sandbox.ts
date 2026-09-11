@@ -88,7 +88,7 @@ export function detectProjectFramework(files: { path: string, content: string }[
   }
 }
 
-export function getDevCommand(packageManager: string, framework: string, files: { path: string, content: string }[]) {
+export function getDevCommand(packageManager: string, framework: string, files: { path: string, content: string }[], port: number) {
   const packageJsonFile = files.find(f => f.path.toLowerCase() === "package.json");
   let hasDevScript = false;
   let hasStartScript = false;
@@ -103,18 +103,20 @@ export function getDevCommand(packageManager: string, framework: string, files: 
 
   // Bind to 0.0.0.0
   if (framework === "vite") {
-    return `${packageManager} run dev -- --host 0.0.0.0`;
+    return `${packageManager} run dev -- --host 0.0.0.0 --port ${port}`;
   }
   
   if (framework === "next") {
-    return `${packageManager} run dev -- -H 0.0.0.0`;
+    return `${packageManager} run dev -- -H 0.0.0.0 -p ${port}`;
   }
   
   if (framework === "cra") {
-    return `HOST=0.0.0.0 ${packageManager} run start`;
+    return `PORT=${port} HOST=0.0.0.0 ${packageManager} run start`;
   }
   
   if (hasDevScript) {
+    // If we just use run dev, we can't reliably inject port without framework knowledge
+    // But Vite and Next are handled above.
     return `${packageManager} run dev`;
   }
   
@@ -123,9 +125,9 @@ export function getDevCommand(packageManager: string, framework: string, files: 
   }
   
   if (framework === "static") {
-    // If it's just static HTML, use python or npx serve
-    return `npx serve -p 3000 -l 0.0.0.0`;
+    // npx serve v14+ takes -l for listening endpoint
+    return `npx serve -l tcp://0.0.0.0:${port} -s .`;
   }
   
-  return `npx serve -p 3000 -l 0.0.0.0`;
+  return `npx serve -l tcp://0.0.0.0:${port} -s .`;
 }
