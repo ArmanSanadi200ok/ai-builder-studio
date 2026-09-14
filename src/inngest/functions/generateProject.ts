@@ -6,294 +6,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
 import { aiProviders, getLiveModels, ProviderModel } from "@/lib/ai/registry";
 import { NonRetriableError } from "inngest";
-
-type AttemptRecord = {
-  provider: string;
-  model: string;
-  stage: string;
-  file?: string;
-  status: string | number;
-  code: string;
-  retryCount: number;
-  result: "success" | "failed" | "fallback";
-};
-
-async function getDecryptedKey(providerId: string, userId: string): Promise<string | null> {
-  const aiProvider = aiProviders[providerId];
-  if (!aiProvider || !aiProvider.requiresKey) return "";
-  
-  const keyRecord = await db.query.userApiKeys.findFirst({
-    where: and(eq(userApiKeys.userId, userId), eq(userApiKeys.provider, providerId)),
-  });
-  if (!keyRecord) return null;
-  
-  try {
-    return decryptKey(keyRecord.encryptedKey, keyRecord.iv);
-  } catch (e) {
-    return null;
-  }
-}
-
-async function makeProviderRequest(providerId: string, modelId: string, apiKey: string, userPrompt: string, isJson: boolean = false, supportsResponseFormat: boolean = true) {
-  let baseUrl = "https://api.openai.com/v1";
-  if (providerId === "groq") baseUrl = "https://api.groq.com/openai/v1";
-  else if (providerId === "openrouter") baseUrl = "https://openrouter.ai/api/v1";
-  else if (providerId === "mistral") baseUrl = "https://api.mistral.ai/v1";
-  else if (providerId === "deepseek") baseUrl = "https://api.deepseek.com/v1";
-  else if (providerId === "together") baseUrl = "https://api.together.xyz/v1";
-  else if (providerId === "cerebras") baseUrl = "https://api.cerebras.ai/v1";
-  else if (providerId === "anthropic" || providerId === "google") {
-    throw { message: `${aiProviders[providerId]?.name} is not currently supported for background generation.`, status: 400 };
-  }
-
-  const payload: any = {
-    model: modelId,
-    messages: [{ role: "user", content: userPrompt }],
-  };
-  
-  console.log(`[Dispatch] Role Sequence: [${payload.messages.map((m: any) => `'${m.role}'`).join(", ")}]`);
-
-  if (isJson && supportsResponseFormat) {
-    payload.response_format = { type: "json_object" };
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new Error("Request Timeout")), 180000);
-
-  try {
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (!res.ok) {
-      let errorText = await res.text();
-      let errorCode = "unknown";
-      try {
-        const j = JSON.parse(errorText);
-        errorCode = j.error?.code || j.error?.type || errorCode;
-        errorText = j.error?.message || errorText;
-      } catch (e) {}
-      
-      throw { message: errorText, status: res.status, code: errorCode };
-    }
-
-    const data = await res.json();
-    let content = data.choices[0].message.content;
-    if (!isJson && content.startsWith("```")) {
-      const lines = content.split("\n");
-      if (lines[0].startsWith("```")) lines.shift();
-      if (lines[lines.length - 1].startsWith("```")) lines.pop();
-      content = lines.join("\n");
-    }
-    return content;
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === 'AbortError' || err.message === 'Request Timeout') {
-        throw { message: "Upstream provider timed out after 180s", status: 408, code: "timeout" };
-    }
-    throw err;
-  }
-}
-
-async function executeWithProviderChain(
-  jobId: string,
-  projectId: string,
-  providerChain: { providerId: string, modelId: string }[],
-  userId: string,
-  prompt: string,
-  isJson: boolean,
-  stepName: string,
-  stage: string,
-  filePath?: string
-) {
-  const attemptHistory: AttemptRecord[] = [];
-  
-  let currentProviderIndex = 0;
-  
-  while (currentProviderIndex < providerChain.length) {
-    let { providerId, modelId } = providerChain[currentProviderIndex];
-    let apiKey = await getDecryptedKey(providerId, userId);
-    
-    if (apiKey === null) {
-      currentProviderIndex++;
-      continue;
-    }
-
-    let attempt = 0;
-    let providerExhausted = false;
-
-    while (attempt < 2 && !providerExhausted) {
-      try {
-        await db.update(projectJobs).set({ 
-          currentStep: `${stepName} using ${providerId} (${modelId})`,
-          activeProvider: providerId,
-          activeModel: modelId
-        }).where(eq(projectJobs.id, jobId));
-        
-        await db.update(projects).set({
-          activeProvider: providerId,
-          activeModel: modelId
-        }).where(eq(projects.id, projectId));
-
-        // Re-resolve capabilities for live model
-        let liveModels: ProviderModel[] = [];
-        try {
-          liveModels = await getLiveModels(providerId, apiKey as string);
-        } catch (e) {}
-        const modelInfo = liveModels.find(m => m.id === modelId);
-        const supportsResponseFormat = modelInfo?.supportsResponseFormat !== false;
-
-        let content = await makeProviderRequest(providerId, modelId, apiKey as string, prompt, isJson, supportsResponseFormat);
-        
-        console.log(`[Diagnostic] Provider: ${providerId} | Model: ${modelId} | Prompt Length: ${prompt.length} | Response Length: ${content ? content.length : 0}`);
-
-        if (isJson) {
-           let rawContent = content;
-           if (content !== null && content !== undefined) {
-             const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-             if (jsonMatch) {
-               content = jsonMatch[1].trim();
-             } else {
-               const braceMatch = content.match(/(\{|\[)[\s\S]*(\}|\])/);
-               if (braceMatch) {
-                 content = braceMatch[0];
-               }
-             }
-           }
-           
-           try {
-             const parsed = JSON.parse(content);
-             if (parsed === null || typeof parsed !== 'object') {
-               throw new Error("Parsed JSON was not an object");
-             }
-             console.log(`[Diagnostic] JSON Parse: SUCCESS`);
-           } catch (e: any) {
-             console.log(`[Diagnostic] JSON Parse: FAILED | Reason: ${e.message}`);
-             throw { message: `Malformed JSON: ${e.message}`, status: 400, code: "malformed_json" };
-           }
-        }
-        
-        attemptHistory.push({
-          provider: providerId,
-          model: modelId,
-          stage: stage,
-          file: filePath,
-          status: 200,
-          code: "success",
-          retryCount: attempt,
-          result: "success"
-        });
-        
-        return { content, providerId, modelId };
-
-      } catch (err: any) {
-        attempt++;
-        const status = err.status || 500;
-        const msg = err.message || String(err);
-        const code = err.code || "unknown";
-        
-        const record: AttemptRecord = {
-          provider: providerId,
-          model: modelId,
-          stage: stage,
-          file: filePath,
-          status: status === 408 ? "timeout" : status,
-          code: code,
-          retryCount: attempt,
-          result: "failed"
-        };
-
-        if (status === 401 || status === 403) {
-           record.result = "fallback";
-           attemptHistory.push(record);
-           providerExhausted = true;
-           break;
-        }
-        
-        if (status === 402) {
-           record.result = "fallback";
-           attemptHistory.push(record);
-           providerExhausted = true;
-           break;
-        }
-
-        if (status === 404 || (status === 400 && (code === "model_not_found" || code === "model_decommissioned" || msg.toLowerCase().includes("model")))) {
-           // Model specifically failed. Resolve live again.
-           try {
-             // Must get fresh api key for live resolution
-             const liveModels = await getLiveModels(providerId, apiKey as string);
-             const available = liveModels.filter(m => m.isAvailable);
-             if (available.length > 0 && available[0].id !== modelId) {
-               record.result = "fallback";
-               attemptHistory.push(record);
-               modelId = available[0].id;
-               continue; // Same provider, new model
-             }
-           } catch (e) {
-             // Failed to resolve live models
-           }
-           record.result = "fallback";
-           attemptHistory.push(record);
-           providerExhausted = true;
-           break;
-        }
-        
-        if (status === 400) {
-           if (code === "malformed_json") {
-             if (attempt < 2) {
-               attemptHistory.push(record);
-               await new Promise(r => setTimeout(r, 2000 * attempt));
-               continue;
-             } else {
-               record.result = "fallback";
-               attemptHistory.push(record);
-               providerExhausted = true;
-               break;
-             }
-           } else {
-             // Not a model error, malformed request etc. Do not fallback models.
-             record.result = "failed";
-             attemptHistory.push(record);
-             throw new NonRetriableError(`Irrecoverable 400 Bad Request: ${msg}`);
-           }
-        }
-
-        if (status === 408 || status === 429 || status >= 500) {
-           if (attempt < 2) {
-             attemptHistory.push(record);
-             await new Promise(r => setTimeout(r, 2000 * attempt));
-             continue;
-           } else {
-             record.result = "fallback";
-             attemptHistory.push(record);
-             providerExhausted = true;
-             break;
-           }
-        }
-
-        record.result = "fallback";
-        attemptHistory.push(record);
-        providerExhausted = true;
-        break;
-      }
-    }
-    
-    currentProviderIndex++;
-  }
-
-  const historyStr = attemptHistory.map((r, i) => 
-    `[${i+1}] ${r.provider}/${r.model} | ${r.status} ${r.code} (${r.result})`
-  ).join("\n");
-  
-  throw new NonRetriableError(`No usable provider remains.\nFallback Trace:\n${historyStr}`);
-}
+import { executeWithProviderChain } from "@/lib/ai/provider-chain";
 
 export const generateProject = inngest.createFunction(
   { 
@@ -311,7 +24,7 @@ export const generateProject = inngest.createFunction(
     }
   },
   async ({ event, step }) => {
-    const { projectId, userId, prompt, attachmentId } = event.data;
+    const { projectId, userId, prompt, attachmentId, mode } = event.data;
 
     const job = await step.run("initialize-job", async () => {
       const project = await db.query.projects.findFirst({
@@ -319,17 +32,6 @@ export const generateProject = inngest.createFunction(
       });
 
       if (!project) throw new Error("Project not found");
-
-      const existingActive = await db.query.projectJobs.findFirst({
-        where: and(
-          eq(projectJobs.projectId, projectId),
-          eq(projectJobs.status, "GENERATING")
-        ),
-      });
-
-      if (existingActive) {
-        throw new Error("Job already generating");
-      }
 
       let selectedProvider = project.selectedProvider || "openai";
       let selectedModel = project.selectedModel || "gpt-4o";
@@ -345,12 +47,13 @@ export const generateProject = inngest.createFunction(
           selectedModel: selectedModel,
           activeProvider: selectedProvider,
           activeModel: selectedModel,
+          updatedAt: new Date(),
         })
         .returning();
 
       await db
         .update(projects)
-        .set({ status: "queued", description: prompt, activeProvider: selectedProvider, activeModel: selectedModel })
+        .set({ status: "generating", description: project.description || prompt, activeProvider: selectedProvider, activeModel: selectedModel })
         .where(eq(projects.id, projectId));
 
       return newJob;
@@ -367,8 +70,6 @@ export const generateProject = inngest.createFunction(
         });
         
         const chain: { providerId: string, modelId: string }[] = [];
-        
-        // 1. Add requested provider first
         const keyMap = new Map(userKeys.map(k => [k.provider, k]));
         
         const resolveProvider = async (providerId: string, preferredModel: string, isFallback: boolean) => {
@@ -382,7 +83,6 @@ export const generateProject = inngest.createFunction(
             const available = liveModels.filter(m => m.isAvailable);
             if (available.length === 0) return null;
             
-            // If preferred model is in liveModels, use it
             if (preferredModel && available.find(m => m.id === preferredModel)) {
                return preferredModel;
             }
@@ -391,15 +91,13 @@ export const generateProject = inngest.createFunction(
               if (providerId === "openrouter") {
                 const freeModels = available.filter(m => m.isFree);
                 if (freeModels.length > 0) return freeModels[0].id;
-                return null; // Avoid silent 402 on paid models if no credit confirmation
+                return null;
               }
               if (providerId === "cerebras" || providerId === "together") {
-                // Cannot guarantee free tier anymore, avoid as automatic fallback
                 return null;
               }
             }
             
-            // Otherwise fallback to first available
             return available[0].id;
           } catch (e) {
             return null;
@@ -411,10 +109,8 @@ export const generateProject = inngest.createFunction(
           chain.push({ providerId: initialProvider, modelId: resolvedInitialModel });
         }
 
-        // 2. Add other configured providers as fallbacks
         for (const providerId of keyMap.keys()) {
           if (providerId === initialProvider) continue;
-          
           const resolvedFallbackModel = await resolveProvider(providerId, "", true);
           if (resolvedFallbackModel) {
              chain.push({ providerId, modelId: resolvedFallbackModel });
@@ -430,8 +126,7 @@ export const generateProject = inngest.createFunction(
 
       // 2. Planning Phase
       const plan = await step.run("planning", async () => {
-        await db.update(projectJobs).set({ status: "PLANNING", currentStep: "Analyzing requirements" }).where(eq(projectJobs.id, job.id));
-        await db.update(projects).set({ status: "generating" }).where(eq(projects.id, projectId));
+        await db.update(projectJobs).set({ status: "PLANNING", currentStep: "Analyzing requirements", updatedAt: new Date() }).where(eq(projectJobs.id, job.id));
         
         let contextText = "";
         if (attachmentId) {
@@ -444,7 +139,31 @@ export const generateProject = inngest.createFunction(
           }
         }
 
-        const systemPrompt = `You are an expert software architect.
+        let currentFilesStr = "";
+        let existingVersionId = null;
+        if (mode === "modification") {
+           const latestVersion = await db.query.projectVersions.findFirst({
+             where: eq(projectVersions.projectId, projectId),
+             orderBy: [desc(projectVersions.versionNumber)]
+           });
+           if (latestVersion) {
+              existingVersionId = latestVersion.id;
+              const files = await db.query.projectFiles.findMany({ where: eq(projectFiles.versionId, latestVersion.id) });
+              currentFilesStr = "\n\nCURRENT PROJECT FILES:\n" + files.map(f => `// ${f.path}\n${f.content}`).join("\n\n");
+           }
+        }
+
+        const systemPrompt = mode === "modification"
+        ? `You are an expert software architect. The user wants to modify an existing project.
+User request: ${prompt}${contextText}${currentFilesStr}
+
+Output JSON format exactly like this (no markdown wrapping):
+{
+  "projectType": "static" | "react",
+  "framework": "none" | "react",
+  "files": [ { "path": "path/to/file", "description": "What this file does, and what changes are needed. If deleting, write 'DELETE'.", "action": "create" | "update" | "delete" } ]
+}`
+        : `You are an expert software architect.
 Create a file structure and implementation plan for the following project:
 ${prompt}${contextText}
 
@@ -458,7 +177,7 @@ Output JSON format exactly like this (no markdown wrapping):
 {
   "projectType": "static" | "react",
   "framework": "none" | "react",
-  "files": [ { "path": "path/to/file", "description": "What this file does" } ]
+  "files": [ { "path": "path/to/file", "description": "What this file does", "action": "create" } ]
 }`;
 
         const { content, providerId, modelId } = await executeWithProviderChain(
@@ -483,7 +202,7 @@ Output JSON format exactly like this (no markdown wrapping):
           activeModel: modelId 
         }).where(eq(projects.id, projectId));
 
-        return { plan: parsedPlan, contextText };
+        return { plan: parsedPlan, contextText, existingVersionId };
       });
 
       // 3. Initialize Version for Files
@@ -504,6 +223,20 @@ Output JSON format exactly like this (no markdown wrapping):
         return newVersion.id;
       });
 
+      // 3.5 Copy existing files to new version if modification
+      if (mode === "modification" && plan.existingVersionId) {
+        await step.run("copy-existing-files", async () => {
+          const files = await db.query.projectFiles.findMany({ where: eq(projectFiles.versionId, plan.existingVersionId as string) });
+          for (const f of files) {
+            await db.insert(projectFiles).values({
+              versionId: versionId,
+              path: f.path,
+              content: f.content
+            });
+          }
+        });
+      }
+
       // 4. Generating Files with Fallback & Upsert
       const filesToGenerate = plan.plan.files || [];
       const generatedFiles: { path: string; error?: string }[] = [];
@@ -512,8 +245,13 @@ Output JSON format exactly like this (no markdown wrapping):
         const file = filesToGenerate[i];
         
         const fileResult = await step.run(`generate-file-${i}`, async () => {
-          await db.update(projectJobs).set({ status: "GENERATING", currentStep: `Generating ${file.path} (${i + 1}/${filesToGenerate.length})` }).where(eq(projectJobs.id, job.id));
+          await db.update(projectJobs).set({ status: "GENERATING", currentStep: `Generating ${file.path} (${i + 1}/${filesToGenerate.length})`, updatedAt: new Date() }).where(eq(projectJobs.id, job.id));
           
+          if (file.action === "delete") {
+            await db.delete(projectFiles).where(and(eq(projectFiles.versionId, versionId), eq(projectFiles.path, file.path)));
+            return { path: file.path, success: true, action: "delete" };
+          }
+
           let filePrompt = "You are an expert developer implementing a project.\n" +
 "Project Request: " + prompt + (plan.contextText || "") + "\n" +
 "Your task is to write the complete content for the file: " + file.path + "\n" +
@@ -522,7 +260,7 @@ Output JSON format exactly like this (no markdown wrapping):
 "Do NOT output markdown outside the JSON. Do NOT output chain-of-thought, thinking process, or conversational preamble.\n" +
 "Example JSON format:\n{\n  \"content\": \"raw file content goes here\"\n}";
 
-          let isJsonFormat = true; // Always force JSON output format
+          let isJsonFormat = true;
 
           let attempt = 0;
           let finalContent = "";
@@ -560,12 +298,10 @@ Output JSON format exactly like this (no markdown wrapping):
             syntaxErrorMsg = "";
             const lowerContent = finalContent.toLowerCase();
 
-            // Sanity check conversational text
             if (lowerContent.includes("here's a thinking process") || lowerContent.includes("here is a thinking process") || lowerContent.includes("sure, i can help") || lowerContent.startsWith("i will write") || lowerContent.startsWith("here is the")) {
                syntaxErrorMsg = "Content appears to contain conversational AI preamble instead of raw source code.";
             }
 
-            // File type heuristics
             if (!syntaxErrorMsg) {
               if (file.path.endsWith('.json') || file.path.toLowerCase() === 'package.json') {
                 try {
@@ -601,101 +337,62 @@ Output JSON format exactly like this (no markdown wrapping):
                 }
               }
             }
-            
-            if (syntaxErrorMsg) {
+
+            if (syntaxErrorMsg && attempt < 1) {
               attempt++;
-            } else {
-              break; // Valid syntax
+              await new Promise(r => setTimeout(r, 2000));
+              continue;
+            } else if (syntaxErrorMsg) {
+              break; 
             }
+            
+            break; 
           }
           
-          if (syntaxErrorMsg) {
-            throw new Error(`Validation failed for ${file.path}: ${syntaxErrorMsg}`);
-          }
-          
-          // UPSERT logic inside the step
-          const existingFile = await db.query.projectFiles.findFirst({
-            where: and(eq(projectFiles.versionId, versionId), eq(projectFiles.path, file.path))
-          });
-          
-          if (existingFile) {
-            await db.update(projectFiles).set({ content: finalContent }).where(eq(projectFiles.id, existingFile.id));
+          if (!syntaxErrorMsg) {
+            const existingFile = await db.query.projectFiles.findFirst({
+              where: and(eq(projectFiles.versionId, versionId), eq(projectFiles.path, file.path))
+            });
+            
+            if (existingFile) {
+              await db.update(projectFiles).set({ content: finalContent }).where(eq(projectFiles.id, existingFile.id));
+            } else {
+              await db.insert(projectFiles).values({ versionId, path: file.path, content: finalContent });
+            }
+            return { path: file.path, success: true };
           } else {
-            await db.insert(projectFiles).values({ versionId, path: file.path, content: finalContent });
+            return { path: file.path, error: syntaxErrorMsg };
           }
-          
-          return { path: file.path, error: syntaxErrorMsg };
         });
         
-        generatedFiles.push(fileResult);
+        generatedFiles.push({ path: file.path, error: (fileResult as any).error });
       }
 
-      // 5. Validation
-      await step.run("validate-project", async () => {
-        await db.update(projectJobs).set({ status: "VALIDATING", currentStep: "Validating generated files" }).where(eq(projectJobs.id, job.id));
+      await step.run("finalize", async () => {
+        const hasErrors = generatedFiles.some(f => f.error);
+        const finalStatus = hasErrors ? "GENERATED_WITH_ERRORS" : "COMPLETED";
         
-        const files = await db.query.projectFiles.findMany({
-          where: eq(projectFiles.versionId, versionId)
-        });
-        
-        const hasReactFiles = files.some(f => f.path.endsWith('.tsx') || f.path.endsWith('.jsx') || f.content.includes("react"));
-        const isReact = plan.plan.projectType === "react" || hasReactFiles;
-        
-        let missing: string[] = [];
-        if (isReact) {
-          const hasPackageJson = files.find(f => f.path.toLowerCase() === "package.json");
-          const hasMain = files.find(f => f.path.toLowerCase().match(/(src\/)?(main|index)\.(tsx|jsx|ts|js)$/));
-          const hasApp = files.find(f => f.path.toLowerCase().match(/(src\/)?app\.(tsx|jsx|ts|js)$/));
-          if (!hasPackageJson) missing.push("package.json");
-          if (!hasMain) missing.push("src/main.tsx (or equivalent entry point)");
-          if (!hasApp) missing.push("src/App.tsx (or equivalent root component)");
-        } else {
-          const hasIndexHtml = files.find(f => f.path.toLowerCase() === "index.html");
-          if (!hasIndexHtml) missing.push("index.html");
-        }
-        
-        if (missing.length > 0) {
-           await db.update(projectJobs).set({ status: "GENERATED_WITH_ERRORS", errorMessage: `Missing required files: ${missing.join(", ")}` }).where(eq(projectJobs.id, job.id));
-           await db.update(projects).set({ status: "generated_with_errors" }).where(eq(projects.id, projectId));
-           return;
-        }
-
-        const hasSyntaxErrors = generatedFiles.some(f => f.error);
-        if (hasSyntaxErrors) {
-           const errFiles = generatedFiles.filter(f => f.error).map(f => f.path).join(', ');
-           await db.update(projectJobs).set({ status: "GENERATED_WITH_ERRORS", errorMessage: `Syntax errors remain in: ${errFiles}` }).where(eq(projectJobs.id, job.id));
-           await db.update(projects).set({ status: "generated_with_errors" }).where(eq(projects.id, projectId));
-           return;
-        }
-
-        await db.update(projectJobs).set({
-          status: "COMPLETED",
-          currentStep: "Project generated successfully",
+        await db.update(projectJobs).set({ 
+          status: finalStatus, 
+          currentStep: "Complete", 
           completedAt: new Date(),
+          updatedAt: new Date(),
         }).where(eq(projectJobs.id, job.id));
-        await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
-      });
-      
-      await step.run("completion-message", async () => {
         
-        const fileList = generatedFiles.map((f: any) => "- " + f.path).join("\n");
-        await db.insert(projectMessages).values({
-          projectId: projectId,
-          role: "assistant",
-          content: "I have finished generating your project!\n\nHere are the files created:\n" + fileList + "\n\nYou can now preview the application or ask me to make modifications.",
-        });
+        await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
       });
 
     } catch (error: any) {
-      await step.run("mark-failed", async () => {
-        await db.update(projectJobs).set({
-          status: "FAILED",
-          errorMessage: error.message,
-          completedAt: new Date(),
+      await step.run("handle-error", async () => {
+        const errorMsg = error instanceof NonRetriableError ? error.message : (error.message || String(error));
+        await db.update(projectJobs).set({ 
+          status: "FAILED", 
+          errorMessage: errorMsg,
+          updatedAt: new Date()
         }).where(eq(projectJobs.id, job.id));
-        await db.update(projects).set({ status: "failed" }).where(eq(projects.id, projectId));
+        
+        await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
       });
-      throw error;
     }
   }
 );

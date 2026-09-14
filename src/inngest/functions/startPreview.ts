@@ -11,6 +11,19 @@ import {
   getDevCommand 
 } from "@/lib/preview/sandbox";
 
+async function safeSandboxOperation<T>(sandbox: any, op: () => Promise<T>): Promise<T> {
+  try {
+    return await op();
+  } catch (e: any) {
+    if (e.message?.includes('SANDBOX_STOPPED') || e.message?.includes('410') || String(e).includes('410') || String(e).includes('SANDBOX_STOPPED')) {
+      console.log(`[Preview] Detected unrecoverable sandbox ${sandbox.name}. Deleting to allow recreation.`);
+      try { await sandbox.delete(); } catch(deleteErr) {}
+      throw new Error(`Sandbox ${sandbox.name} was unrecoverable and has been deleted. Inngest will retry and create a fresh one.`);
+    }
+    throw e;
+  }
+}
+
 export const startPreviewSandbox = inngest.createFunction(
   { 
     id: "start-preview-sandbox",
@@ -82,7 +95,9 @@ export const startPreviewSandbox = inngest.createFunction(
         const sandbox = await Sandbox.get({ name: sandboxInfo.name, ...credentials });
         if (!sandbox) throw new Error("Sandbox lost");
         
-        await syncFilesToSandbox(sandbox, files);
+        await safeSandboxOperation(sandbox, async () => {
+          await syncFilesToSandbox(sandbox, files);
+        });
         
         const pm = detectPackageManager(files);
         const fw = detectProjectFramework(files);
@@ -106,7 +121,10 @@ export const startPreviewSandbox = inngest.createFunction(
           const sandbox = await Sandbox.get({ name: sandboxInfo.name, ...credentials });
           if (!sandbox) throw new Error("Sandbox lost");
 
-          const installResult = await sandbox.runCommand(packageManager, ["install"]);
+          const installResult = await safeSandboxOperation(sandbox, async () => {
+             return await sandbox.runCommand(packageManager, ["install"]);
+          });
+          
           if (installResult.exitCode !== 0) {
             throw new Error(`Dependency installation failed:\n${installResult.stderr || installResult.stdout}`);
           }
@@ -135,7 +153,7 @@ export const startPreviewSandbox = inngest.createFunction(
         
         // 1. Check if the process is ALREADY listening and healthy
         try {
-          previewUrl = await sandbox.domain(targetPort);
+          previewUrl = await safeSandboxOperation(sandbox, async () => sandbox.domain(targetPort));
           const res = await fetch(previewUrl);
           if (res.ok || res.status === 404 || res.status === 403) {
             isReady = true;
@@ -149,14 +167,18 @@ export const startPreviewSandbox = inngest.createFunction(
         
         if (!isReady) {
           // Kill any dead/zombie process bound to the target port
-          await sandbox.runCommand({ cmd: "sh", args: ["-c", `kill -9 $(lsof -t -i:${targetPort}) 2>/dev/null || true`] });
+          await safeSandboxOperation(sandbox, async () => {
+            await sandbox.runCommand({ cmd: "sh", args: ["-c", `kill -9 $(lsof -t -i:${targetPort}) 2>/dev/null || true`] });
+          });
           
           const devCommand = getDevCommand(packageManager, framework, files, targetPort);
           
-          devCmd = await sandbox.runCommand({
-            cmd: "sh",
-            args: ["-c", devCommand],
-            detached: true
+          devCmd = await safeSandboxOperation(sandbox, async () => {
+            return await sandbox.runCommand({
+              cmd: "sh",
+              args: ["-c", devCommand],
+              detached: true
+            });
           });
           
           // Listen for early crashes
@@ -171,15 +193,15 @@ export const startPreviewSandbox = inngest.createFunction(
             }
             
             try {
-              previewUrl = await sandbox.domain(targetPort);
+              previewUrl = await safeSandboxOperation(sandbox, async () => sandbox.domain(targetPort));
               const res = await fetch(previewUrl);
               // 200 OK, 404 Not Found (app is running but no index), 403 Forbidden (Vite host check) all mean the server is ALIVE.
               if (res.ok || res.status === 404 || res.status === 403) {
                 isReady = true;
                 break;
               }
-            } catch (e) {
-              // Ignore fetch errors (ECONNREFUSED) or sandbox.domain throwing "No route for port"
+            } catch (e: any) {
+              if (e.message?.includes('unrecoverable')) throw e; // Let the safeSandboxOperation error propagate
             }
             await new Promise(r => setTimeout(r, 1000));
           }
@@ -201,9 +223,22 @@ export const startPreviewSandbox = inngest.createFunction(
 
     } catch (error: any) {
       await step.run("handle-error", async () => {
+        // If we threw our "unrecoverable" error, we do NOT want to mark it as FAILED if Inngest will retry it.
+        // Wait, Inngest retries steps by default. If a step throws, it retries that step.
+        // But if `create-sandbox` succeeded and `sync-files` threw, Inngest will retry `sync-files`!
+        // If it retries `sync-files`, it calls `Sandbox.get()` and finds NO sandbox because we deleted it!
+        // `Sandbox.get()` returning null causes `throw new Error("Sandbox lost")`.
+        // Then it retries again, still lost.
+        // To fix this, we should throw a NonRetriableError, and let the user click "Retry Preview".
+        // BUT wait, Inngest has a feature to retry the whole function? No.
+        // Let's just fail it with a clean message so the user clicks "Retry Preview". The next time, it will create a fresh one!
+        let msg = error.message || String(error);
+        if (msg.includes("was unrecoverable and has been deleted")) {
+          msg = "Sandbox was in a stopped/unreachable state and has been reset. Please click Retry Preview to start a fresh environment.";
+        }
         await db.update(projects).set({ 
           previewStatus: "FAILED",
-          previewError: error.message || String(error)
+          previewError: msg
         }).where(eq(projects.id, projectId));
       });
     }
