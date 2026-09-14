@@ -50,14 +50,12 @@ export async function makeProviderRequest(providerId: string, modelId: string, a
     messages: [{ role: "user", content: userPrompt }],
   };
   
-  console.log(`[Dispatch] Role Sequence: [${payload.messages.map((m: any) => `'${m.role}'`).join(", ")}]`);
-
   if (isJson && supportsResponseFormat) {
     payload.response_format = { type: "json_object" };
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new Error("Request Timeout")), 180000);
+  const timeoutId = setTimeout(() => controller.abort(new Error("Request Timeout")), 40000); // 40 SECONDS TIMEOUT
 
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -95,7 +93,7 @@ export async function makeProviderRequest(providerId: string, modelId: string, a
   } catch (err: any) {
     clearTimeout(timeoutId);
     if (err.name === 'AbortError' || err.message === 'Request Timeout') {
-        throw { message: "Upstream provider timed out after 180s", status: 408, code: "timeout" };
+        throw { message: "Upstream provider timed out after 40s", status: 408, code: "timeout" };
     }
     throw err;
   }
@@ -112,11 +110,20 @@ export async function executeWithProviderChain(
   stage: string,
   filePath?: string
 ) {
+  const globalStartTime = Date.now();
+  const GLOBAL_TIMEOUT_MS = 180000; // 180 seconds global timeout
+  
   const attemptHistory: AttemptRecord[] = [];
   
   let currentProviderIndex = 0;
   
   while (currentProviderIndex < providerChain.length) {
+    // Check global timeout boundary
+    if (Date.now() - globalStartTime > GLOBAL_TIMEOUT_MS) {
+       console.log(`[Diagnostic] executeWithProviderChain exceeded global timeout of ${GLOBAL_TIMEOUT_MS}ms. Aborting.`);
+       throw new NonRetriableError(`Generation exceeded safety timeout of 3 minutes. Please try again.`);
+    }
+
     let { providerId, modelId } = providerChain[currentProviderIndex];
     let apiKey = await getDecryptedKey(providerId, userId);
     
@@ -129,6 +136,12 @@ export async function executeWithProviderChain(
     let providerExhausted = false;
 
     while (attempt < 2 && !providerExhausted) {
+      // Check global timeout boundary again inside the loop
+      if (Date.now() - globalStartTime > GLOBAL_TIMEOUT_MS) {
+         throw new NonRetriableError(`Generation exceeded safety timeout of 3 minutes. Please try again.`);
+      }
+
+      const iterationStartTime = Date.now();
       try {
         if (jobId) {
           await db.update(projectJobs).set({ 
@@ -143,7 +156,6 @@ export async function executeWithProviderChain(
           activeModel: modelId
         }).where(eq(projects.id, projectId));
 
-        // Re-resolve capabilities for live model
         let liveModels: ProviderModel[] = [];
         try {
           liveModels = await getLiveModels(providerId, apiKey as string);
@@ -153,7 +165,8 @@ export async function executeWithProviderChain(
 
         let content = await makeProviderRequest(providerId, modelId, apiKey as string, prompt, isJson, supportsResponseFormat);
         
-        console.log(`[Diagnostic] Provider: ${providerId} | Model: ${modelId} | Prompt Length: ${prompt.length} | Response Length: ${content ? content.length : 0}`);
+        const iterationDurationMs = Date.now() - iterationStartTime;
+        console.log(`[Timing] ${projectId} | ${jobId} | ${providerId} | ${modelId} | ${stage} | Start: ${iterationStartTime} | End: ${Date.now()} | Duration: ${iterationDurationMs}ms | Status: 200 | Result: completed`);
 
         if (isJson) {
            let rawContent = content;
@@ -174,9 +187,7 @@ export async function executeWithProviderChain(
              if (parsed === null || typeof parsed !== 'object') {
                throw new Error("Parsed JSON was not an object");
              }
-             console.log(`[Diagnostic] JSON Parse: SUCCESS`);
            } catch (e: any) {
-             console.log(`[Diagnostic] JSON Parse: FAILED | Reason: ${e.message}`);
              throw { message: `Malformed JSON: ${e.message}`, status: 400, code: "malformed_json" };
            }
         }
@@ -200,6 +211,9 @@ export async function executeWithProviderChain(
         const msg = err.message || String(err);
         const code = err.code || "unknown";
         
+        const iterationDurationMs = Date.now() - iterationStartTime;
+        console.log(`[Timing] ${projectId} | ${jobId} | ${providerId} | ${modelId} | ${stage} | Start: ${iterationStartTime} | End: ${Date.now()} | Duration: ${iterationDurationMs}ms | Status: ${status} | Result: threw (${code})`);
+
         const record: AttemptRecord = {
           provider: providerId,
           model: modelId,
@@ -211,14 +225,7 @@ export async function executeWithProviderChain(
           result: "failed"
         };
 
-        if (status === 401 || status === 403) {
-           record.result = "fallback";
-           attemptHistory.push(record);
-           providerExhausted = true;
-           break;
-        }
-        
-        if (status === 402) {
+        if (status === 401 || status === 403 || status === 402) {
            record.result = "fallback";
            attemptHistory.push(record);
            providerExhausted = true;
@@ -226,20 +233,16 @@ export async function executeWithProviderChain(
         }
 
         if (status === 404 || (status === 400 && (code === "model_not_found" || code === "model_decommissioned" || msg.toLowerCase().includes("model")))) {
-           // Model specifically failed. Resolve live again.
            try {
-             // Must get fresh api key for live resolution
              const liveModels = await getLiveModels(providerId, apiKey as string);
              const available = liveModels.filter(m => m.isAvailable);
              if (available.length > 0 && available[0].id !== modelId) {
                record.result = "fallback";
                attemptHistory.push(record);
                modelId = available[0].id;
-               continue; // Same provider, new model
+               continue; 
              }
-           } catch (e) {
-             // Failed to resolve live models
-           }
+           } catch (e) {}
            record.result = "fallback";
            attemptHistory.push(record);
            providerExhausted = true;
@@ -259,7 +262,6 @@ export async function executeWithProviderChain(
                break;
              }
            } else {
-             // Not a model error, malformed request etc. Do not fallback models.
              record.result = "failed";
              attemptHistory.push(record);
              throw new NonRetriableError(`Irrecoverable 400 Bad Request: ${msg}`);
