@@ -14,6 +14,7 @@ interface WorkspaceClientProps {
     status: string;
     selectedProvider: string | null;
     selectedModel: string | null;
+    applicationType?: string | null;
   };
   initialMessages?: {
     id: string;
@@ -529,11 +530,14 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
         <section className="flex-1 flex flex-col bg-surface-dim relative min-w-0">
           <div className="h-12 border-b border-outline-variant/10 bg-surface-container flex items-center justify-between px-md shrink-0">
             <div className="flex items-center gap-sm">
-              <span className="font-label-caps text-label-caps text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded">Preview</span>
+              <span className="font-label-caps text-label-caps text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded">
+                {project.applicationType === "MOBILE_APP" ? "Mobile Build" : project.applicationType === "WHATSAPP_BOT" ? "Backend Services" : "Live Preview"}
+              </span>
               <span className="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-2">
                 {status === "draft" ? "Ready to start building" : 
                  status === "generating" ? "Generating..." : 
-                 status === "generated_with_errors" ? "Generated with errors" : "Ready"}
+                 status === "generated_with_errors" ? "Generated with errors" : 
+                 project.applicationType === "MOBILE_APP" ? "Source code ready" : "Ready"}
               </span>
             </div>
             <div className="flex gap-2">
@@ -563,7 +567,18 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               <div className="w-full max-w-[800px] bg-[#0f0f11] rounded-xl border border-outline-variant/20 shadow-2xl overflow-hidden flex flex-col min-h-[500px] ring-1 ring-white/5 relative">
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-white">
                   {files.length > 0 ? (
-                    previewState.status === "READY" && previewState.url ? (
+                    project.applicationType === "MOBILE_APP" ? (
+                      <div className="w-full h-full p-8 flex flex-col items-center justify-center bg-[#1e1e1e] text-white font-body text-sm text-center">
+                        <span className="material-symbols-outlined text-[48px] mb-4 opacity-70">smartphone</span>
+                        <h3 className="text-lg font-bold mb-2">Mobile Application Generated</h3>
+                        <p className="max-w-sm text-on-surface-variant">
+                          The mobile app source code and configuration have been successfully generated. Browser-based live preview is not supported for this framework.
+                        </p>
+                        <p className="mt-4 text-xs text-on-surface-variant/70">
+                          Please download the code or deploy using a mobile build service (e.g. EAS).
+                        </p>
+                      </div>
+                    ) : previewState.status === "READY" && previewState.url ? (
                       <iframe 
                         src={previewState.url} 
                         className="w-full h-full border-0 bg-white"

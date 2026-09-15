@@ -10,6 +10,7 @@ export const projects = pgTable("project", {
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
+  applicationType: text("applicationType", { enum: ["WEB_APP", "MOBILE_APP", "WHATSAPP_BOT", "MULTI_COMPONENT"] }),
   status: text("status", { enum: ["draft", "queued", "generating", "validating", "ready", "deploying", "deployed", "failed", "cancelled", "generated_with_errors"] }).notNull().default("draft"),
   selectedProvider: text("selectedProvider"),
   selectedModel: text("selectedModel"),

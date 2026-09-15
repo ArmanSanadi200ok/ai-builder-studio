@@ -43,6 +43,7 @@ export default async function WorkspacePage({ params }: { params: Promise<{ id: 
     selectedModel: project.selectedModel,
     activeProvider: project.activeProvider,
     activeModel: project.activeModel,
+    applicationType: project.applicationType,
   };
 
   const serializableMessages = dbMessages.map(msg => ({

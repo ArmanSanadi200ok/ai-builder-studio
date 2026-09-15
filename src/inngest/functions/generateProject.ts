@@ -159,24 +159,39 @@ User request: ${prompt}${contextText}${currentFilesStr}
 
 Output JSON format exactly like this (no markdown wrapping):
 {
-  "projectType": "static" | "react",
-  "framework": "none" | "react",
+  "applicationType": "WEB_APP" | "MOBILE_APP" | "WHATSAPP_BOT" | "MULTI_COMPONENT",
+  "projectType": "static" | "react" | "react-native" | "node",
+  "framework": "none" | "react" | "expo" | "express",
   "files": [ { "path": "path/to/file", "description": "What this file does, and what changes are needed. If deleting, write 'DELETE'.", "action": "create" | "update" | "delete" } ]
 }`
-        : `You are an expert software architect.
+        : `You are an expert software architect. ABS is a production application generation engine.
 Create a file structure and implementation plan for the following project:
 ${prompt}${contextText}
 
-You MUST choose one of the following two standard shapes for the project:
-1. Static shape (for simple/non-interactive requests like a "hello world" page):
-   Must include index.html, style.css, script.js (or index.html + inline).
-2. React shape (for requests implying interactivity/state/multiple views/components, like a todo app):
-   Must include package.json, index.html, src/main.tsx, src/App.tsx, src/index.css, and any necessary src/components/*.
+First, classify the application type based on the request:
+- WEB_APP: Web applications, SaaS dashboards, websites.
+- MOBILE_APP: Mobile apps (e.g. food delivery app, fitness tracker).
+- WHATSAPP_BOT: Backend/webhook-oriented WhatsApp chatbots.
+- MULTI_COMPONENT: Requests combining multiple surfaces (e.g. web frontend + backend + bot).
+
+Then, choose the architecture.
+For WEB_APP:
+- Generate a complete production-ready web application (valid package.json, linux-compatible commands, Vercel-ready).
+- Choose "static" (index.html + css) or "react" (package.json, src/App.tsx, Vite).
+For MOBILE_APP:
+- Generate an actual mobile/cross-platform project (e.g., React Native/Expo).
+- Do NOT fake it as a browser app. Include appropriate config/package.json.
+For WHATSAPP_BOT:
+- Generate a Node/Express backend with webhook/API architecture.
+- Do NOT hardcode credentials. Use environment variables.
+For MULTI_COMPONENT:
+- Separate components cleanly (e.g. frontend/ and backend/).
 
 Output JSON format exactly like this (no markdown wrapping):
 {
-  "projectType": "static" | "react",
-  "framework": "none" | "react",
+  "applicationType": "WEB_APP" | "MOBILE_APP" | "WHATSAPP_BOT" | "MULTI_COMPONENT",
+  "projectType": "static" | "react" | "react-native" | "node",
+  "framework": "none" | "react" | "expo" | "express",
   "files": [ { "path": "path/to/file", "description": "What this file does", "action": "create" } ]
 }`;
 
@@ -194,12 +209,13 @@ Output JSON format exactly like this (no markdown wrapping):
         try {
            parsedPlan = JSON.parse(content);
         } catch (e) {
-           parsedPlan = { projectType: "static", framework: "none", files: [] };
+           parsedPlan = { applicationType: "WEB_APP", projectType: "static", framework: "none", files: [] };
         }
         
         await db.update(projects).set({ 
           activeProvider: providerId, 
-          activeModel: modelId 
+          activeModel: modelId,
+          applicationType: parsedPlan.applicationType || "WEB_APP"
         }).where(eq(projects.id, projectId));
 
         return { plan: parsedPlan, contextText, existingVersionId };

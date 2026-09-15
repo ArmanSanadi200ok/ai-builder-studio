@@ -48,6 +48,15 @@ export const startPreviewSandbox = inngest.createFunction(
         throw new Error("Project not found or unauthorized");
       }
       
+      // If mobile app, bypass sandbox
+      if (proj.applicationType === "MOBILE_APP") {
+        await db.update(projects).set({ 
+          previewStatus: "READY",
+          previewError: null
+        }).where(eq(projects.id, projectId));
+        return proj;
+      }
+      
       // Update status to CREATING_SANDBOX
       await db.update(projects).set({ 
         previewStatus: "CREATING_SANDBOX",
@@ -56,6 +65,10 @@ export const startPreviewSandbox = inngest.createFunction(
       
       return proj;
     });
+
+    if (project.applicationType === "MOBILE_APP") {
+      return { status: "skipped", reason: "Mobile app preview bypass" };
+    }
 
     // 2. Fetch latest project version and files
     const files = await step.run("fetch-files", async () => {
