@@ -24,8 +24,7 @@ export default async function VercelConfigurationPage({
     return redirect(`/login?callbackUrl=${encodeURIComponent(`/vercel/configure?${search.toString()}`)}`);
   }
 
-  const clientId = process.env.VERCEL_INTEGRATION_CLIENT_ID || process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
-  const clientSecret = process.env.VERCEL_INTEGRATION_CLIENT_SECRET || process.env.VERCEL_APP_CLIENT_SECRET;
+
 
   // The OAuth token exchange is now handled separately by /api/auth/vercel/callback
   // This page only renders the UI for the Vercel Integration configuration.

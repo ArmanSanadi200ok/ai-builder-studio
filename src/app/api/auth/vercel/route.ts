@@ -7,7 +7,7 @@ export async function GET(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const clientId = process.env.VERCEL_INTEGRATION_CLIENT_ID || process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
+  const clientId = process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
   if (!clientId) {
     return new Response("Vercel Client ID not configured", { status: 500 });
   }

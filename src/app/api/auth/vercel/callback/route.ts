@@ -26,8 +26,8 @@ export async function GET(req: Request) {
     });
   }
 
-  const clientId = process.env.VERCEL_INTEGRATION_CLIENT_ID || process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
-  const clientSecret = process.env.VERCEL_INTEGRATION_CLIENT_SECRET || process.env.VERCEL_APP_CLIENT_SECRET;
+  const clientId = process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
+  const clientSecret = process.env.VERCEL_APP_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
     return new Response("Vercel OAuth credentials not configured", { status: 500 });

@@ -40,7 +40,7 @@ export default async function SettingsPage() {
         integrations={integrations.map(i => ({ provider: i.provider }))}
         envConfigured={{
           github: !!process.env.AUTH_GITHUB_ID,
-          vercel: !!process.env.VERCEL_INTEGRATION_CLIENT_ID
+          vercel: !!process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID
         }}
       />
     </div>
