@@ -11,6 +11,14 @@ export async function GET(req: Request) {
   const teamId = url.searchParams.get("teamId");
   const nextParam = url.searchParams.get("next");
 
+  const error = url.searchParams.get("error");
+  const errorDescription = url.searchParams.get("error_description");
+
+  if (error) {
+    console.error("Vercel OAuth Error:", error, errorDescription);
+    return new Response(`Vercel OAuth Error: ${error} - ${errorDescription || "Unknown error"}`, { status: 400 });
+  }
+
   if (!code) {
     return new Response("Missing code parameter", { status: 400 });
   }
