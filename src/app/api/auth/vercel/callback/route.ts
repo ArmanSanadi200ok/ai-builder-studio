@@ -42,6 +42,7 @@ export async function GET(req: Request) {
   }
 
   const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
+  const tokenEndpoint = "https://api.vercel.com/v2/oauth/access_token";
 
   // Safe server-side logging
   const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
@@ -49,17 +50,20 @@ export async function GET(req: Request) {
   console.log("- NEXT_PUBLIC_VERCEL_APP_CLIENT_ID exists:", !!clientId);
   console.log("- Masked Client ID:", maskedClientId);
   console.log("- VERCEL_APP_CLIENT_SECRET exists:", !!clientSecret);
+  console.log("- token endpoint:", tokenEndpoint);
   console.log("- redirect_uri:", redirectUri);
+  console.log("- authentication method: HTTP Basic Header");
 
   try {
-    const response = await fetch("https://api.vercel.com/v2/oauth/access_token", {
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    
+    const response = await fetch(tokenEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Basic ${basicAuth}`,
       },
       body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
         code: code,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
