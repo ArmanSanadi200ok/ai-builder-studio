@@ -41,6 +41,16 @@ export async function GET(req: Request) {
     return new Response("Vercel OAuth credentials not configured", { status: 500 });
   }
 
+  const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
+
+  // Safe server-side logging
+  const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
+  console.log("Vercel OAuth Token Exchange Debug:");
+  console.log("- NEXT_PUBLIC_VERCEL_APP_CLIENT_ID exists:", !!clientId);
+  console.log("- Masked Client ID:", maskedClientId);
+  console.log("- VERCEL_APP_CLIENT_SECRET exists:", !!clientSecret);
+  console.log("- redirect_uri:", redirectUri);
+
   try {
     const response = await fetch("https://api.vercel.com/v2/oauth/access_token", {
       method: "POST",
@@ -51,7 +61,8 @@ export async function GET(req: Request) {
         client_id: clientId,
         client_secret: clientSecret,
         code: code,
-        redirect_uri: `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
       }),
     });
 
