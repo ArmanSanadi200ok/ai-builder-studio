@@ -20,6 +20,7 @@ export async function GET(req: Request) {
   const url = new URL("https://vercel.com/oauth/authorize");
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("state", state);
+  url.searchParams.set("redirect_uri", `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`);
   
   return redirect(url.toString());
 }
