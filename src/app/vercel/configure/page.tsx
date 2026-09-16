@@ -1,22 +1,76 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { db } from "@/db";
+import { userIntegrations } from "@/db/schema/settings";
+import { eq, and } from "drizzle-orm";
+import { encryptKey } from "@/lib/encryption";
 
 export default async function VercelConfigurationPage({
   searchParams,
 }: {
-  searchParams: Promise<{ configurationId?: string; teamId?: string; next?: string }>;
+  searchParams: Promise<{ configurationId?: string; teamId?: string; next?: string; code?: string }>;
 }) {
   const session = await auth();
   const params = await searchParams;
 
-  if (!session?.user) {
+  if (!session?.user?.id) {
     // If user is not logged in, they need to log in first and then return here.
     const search = new URLSearchParams();
     if (params.configurationId) search.set("configurationId", params.configurationId);
     if (params.teamId) search.set("teamId", params.teamId);
     if (params.next) search.set("next", params.next);
+    if (params.code) search.set("code", params.code);
     
     return redirect(`/login?callbackUrl=${encodeURIComponent(`/vercel/configure?${search.toString()}`)}`);
+  }
+
+  const clientId = process.env.VERCEL_INTEGRATION_CLIENT_ID || process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
+  const clientSecret = process.env.VERCEL_INTEGRATION_CLIENT_SECRET || process.env.VERCEL_APP_CLIENT_SECRET;
+
+  if (params.code && clientId && clientSecret) {
+    try {
+      const response = await fetch("https://api.vercel.com/v2/oauth/access_token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: params.code,
+          redirect_uri: `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/vercel/configure`,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const { encryptedKey: encryptedAccessToken, iv: accessIv } = encryptKey(data.access_token);
+        
+        // Ensure we handle duplicate providers safely if no constraint exists
+        // Clean way:
+        await db.delete(userIntegrations).where(and(eq(userIntegrations.userId, session.user.id), eq(userIntegrations.provider, "vercel")));
+        await db.insert(userIntegrations).values({
+          userId: session.user.id,
+          provider: "vercel",
+          providerAccountId: data.user_id || "vercel_user",
+          encryptedAccessToken,
+          accessIv,
+        });
+
+        // Redirect to remove the code from the URL
+        const redirectUrl = new URL(`/vercel/configure`, process.env.AUTH_URL || "https://aibuilderstudio.vercel.app");
+        if (params.configurationId) redirectUrl.searchParams.set("configurationId", params.configurationId);
+        if (params.teamId) redirectUrl.searchParams.set("teamId", params.teamId);
+        if (params.next) redirectUrl.searchParams.set("next", params.next);
+        
+        return redirect(redirectUrl.toString());
+      } else {
+        const err = await response.text();
+        console.error("Vercel OAuth Error:", err);
+      }
+    } catch (e) {
+      console.error("Failed to exchange Vercel code:", e);
+    }
   }
 
   return (

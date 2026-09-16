@@ -25,10 +25,12 @@ export function IntegrationsTab({ integrations, envConfigured = { github: false,
               {hasVercel ? "Connected" : envConfigured.vercel ? "Ready to connect" : "OAuth configuration required"}
             </span>
           </div>
-          {envConfigured.vercel && (
-            <Button variant="secondary" disabled>
-              Coming Soon
-            </Button>
+          {!hasVercel && envConfigured.vercel && (
+            <a href="/api/auth/vercel">
+              <Button variant="secondary">
+                Connect Vercel
+              </Button>
+            </a>
           )}
         </div>
         {!envConfigured.vercel && (

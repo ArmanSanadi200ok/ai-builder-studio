@@ -1,11 +1,16 @@
 import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 
 export default async function DashboardPage() {
   const session = await auth();
   const user = session?.user;
 
-  const userId = session!.user!.id as string;
+  if (!user?.id) {
+    return redirect("/login");
+  }
+
+  const userId = user.id;
 
   // Fetch actual counts for the current user
   const [projectsCount, apiKeysCount] = await Promise.all([
