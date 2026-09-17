@@ -67,16 +67,40 @@ export async function POST(req: Request) {
       data: f.content
     }));
 
+    // Introspect the token to verify its validity and scopes
+    const clientId = process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID || "";
+    const clientSecret = process.env.VERCEL_APP_CLIENT_SECRET || "";
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+
+    const introspectionRes = await fetch("https://api.vercel.com/login/oauth/token/introspect", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Basic ${basicAuth}`,
+      },
+      body: new URLSearchParams({ token: token }),
+    });
+
+    let introspectionData: any = {};
+    if (introspectionRes.ok) {
+      introspectionData = await introspectionRes.json();
+    }
+
     // Start deployment
     const vercelEndpoint = "https://api.vercel.com/v13/deployments";
 
     const maskedPrefix = token.startsWith('vca_') ? 'vca_***' : token.startsWith('vci_') ? 'vci_***' : 'other_***';
+    const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
     
     console.log("Vercel Deploy API Debug:");
     console.log("- credential source/type: OAuth Access Token from userIntegrations");
     console.log(`- masked token prefix: ${maskedPrefix}`);
     console.log(`- token validity/expiry handling: None currently implemented in deploy route. Token may be expired if short-lived.`);
     console.log(`- refresh token stored: ${!!integration.encryptedRefreshToken}`);
+    console.log(`- token active (introspection): ${introspectionData.active}`);
+    console.log(`- client_id (masked): ${maskedClientId}`);
+    console.log(`- token expiry timestamp: ${introspectionData.exp}`);
+    console.log(`- requested scopes/permissions: ${introspectionData.scope || "none"}`);
     console.log("- endpoint URL:", vercelEndpoint);
     console.log("- HTTP method: POST");
     console.log("- teamId/ownership context: None explicitly passed, defaults to personal account");
