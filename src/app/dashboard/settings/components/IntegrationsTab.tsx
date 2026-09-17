@@ -1,10 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
+import { signIn } from "next-auth/react";
 
-export function IntegrationsTab({ integrations, envConfigured = { github: false, vercel: false } }: { integrations: { provider: string }[], envConfigured?: { github: boolean, vercel: boolean } }) {
+export function IntegrationsTab({ integrations, isGithubConnected = false, envConfigured = { github: false, vercel: false } }: { integrations: { provider: string }[], isGithubConnected?: boolean, envConfigured?: { github: boolean, vercel: boolean } }) {
   const hasVercel = integrations.some(i => i.provider === "vercel");
-  const hasGithub = integrations.some(i => i.provider === "github_integration");
+  const hasGithub = isGithubConnected;
 
   return (
     <div className="flex flex-col gap-6 max-w-2xl">
@@ -59,8 +60,8 @@ export function IntegrationsTab({ integrations, envConfigured = { github: false,
             </span>
           </div>
           {envConfigured.github && (
-            <Button variant="secondary" disabled>
-              Coming Soon
+            <Button variant="secondary" onClick={() => signIn("github")}>
+              {hasGithub ? "Reconnect GitHub" : "Connect GitHub"}
             </Button>
           )}
         </div>
