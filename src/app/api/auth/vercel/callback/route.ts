@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { userIntegrations } from "@/db/schema/settings";
 import { eq, and } from "drizzle-orm";
 import { encryptKey } from "@/lib/encryption";
+import { cookies } from "next/headers";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -43,6 +44,11 @@ export async function GET(req: Request) {
 
   const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
   const tokenEndpoint = "https://api.vercel.com/login/oauth/token";
+  const codeVerifier = cookies().get("oauth_code_verifier")?.value;
+
+  if (!codeVerifier) {
+    return new Response("Missing PKCE code verifier", { status: 400 });
+  }
 
   // Safe server-side logging
   const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
@@ -50,6 +56,8 @@ export async function GET(req: Request) {
   console.log("- NEXT_PUBLIC_VERCEL_APP_CLIENT_ID exists:", !!clientId);
   console.log("- Masked Client ID:", maskedClientId);
   console.log("- VERCEL_APP_CLIENT_SECRET exists:", !!clientSecret);
+  console.log("- oauth_code_verifier cookie exists:", !!codeVerifier);
+  console.log("- code_verifier length:", codeVerifier?.length || 0);
   console.log("- token endpoint:", tokenEndpoint);
   console.log("- redirect_uri:", redirectUri);
   console.log("- authentication method: HTTP Basic Header");
@@ -67,6 +75,7 @@ export async function GET(req: Request) {
         code: code,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
+        code_verifier: codeVerifier,
       }),
     });
 
@@ -74,6 +83,9 @@ export async function GET(req: Request) {
       const data = await response.json();
       const { encryptedKey: encryptedAccessToken, iv: accessIv } = encryptKey(data.access_token);
       
+      // Clear the PKCE cookie
+      cookies().delete("oauth_code_verifier");
+
       await db.delete(userIntegrations).where(
         and(eq(userIntegrations.userId, session.user.id), eq(userIntegrations.provider, "vercel"))
       );
