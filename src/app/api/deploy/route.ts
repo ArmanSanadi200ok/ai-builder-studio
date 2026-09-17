@@ -70,10 +70,16 @@ export async function POST(req: Request) {
     // Start deployment
     const vercelEndpoint = "https://api.vercel.com/v13/deployments";
 
+    const maskedPrefix = token.startsWith('vca_') ? 'vca_***' : token.startsWith('vci_') ? 'vci_***' : 'other_***';
+    
     console.log("Vercel Deploy API Debug:");
     console.log("- credential source/type: OAuth Access Token from userIntegrations");
-    console.log(`- masked token prefix: ${token.substring(0, 4)}...`);
-    console.log("- endpoint:", vercelEndpoint);
+    console.log(`- masked token prefix: ${maskedPrefix}`);
+    console.log(`- token validity/expiry handling: None currently implemented in deploy route. Token may be expired if short-lived.`);
+    console.log(`- refresh token stored: ${!!integration.encryptedRefreshToken}`);
+    console.log("- endpoint URL:", vercelEndpoint);
+    console.log("- HTTP method: POST");
+    console.log("- teamId/ownership context: None explicitly passed, defaults to personal account");
 
     const vercelRes = await fetch(vercelEndpoint, {
       method: "POST",
