@@ -22,7 +22,8 @@ export async function GET(req: Request) {
   const codeChallenge = crypto.createHash("sha256").update(codeVerifier).digest("base64url");
 
   // Save code_verifier in cookie
-  cookies().set("oauth_code_verifier", codeVerifier, {
+  const cookieStore = await cookies();
+  cookieStore.set("oauth_code_verifier", codeVerifier, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

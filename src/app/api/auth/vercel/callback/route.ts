@@ -44,7 +44,9 @@ export async function GET(req: Request) {
 
   const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
   const tokenEndpoint = "https://api.vercel.com/login/oauth/token";
-  const codeVerifier = cookies().get("oauth_code_verifier")?.value;
+  
+  const cookieStore = await cookies();
+  const codeVerifier = cookieStore.get("oauth_code_verifier")?.value;
 
   if (!codeVerifier) {
     return new Response("Missing PKCE code verifier", { status: 400 });
@@ -84,7 +86,7 @@ export async function GET(req: Request) {
       const { encryptedKey: encryptedAccessToken, iv: accessIv } = encryptKey(data.access_token);
       
       // Clear the PKCE cookie
-      cookies().delete("oauth_code_verifier");
+      cookieStore.delete("oauth_code_verifier");
 
       await db.delete(userIntegrations).where(
         and(eq(userIntegrations.userId, session.user.id), eq(userIntegrations.provider, "vercel"))
