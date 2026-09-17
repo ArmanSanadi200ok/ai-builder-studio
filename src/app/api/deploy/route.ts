@@ -68,7 +68,14 @@ export async function POST(req: Request) {
     }));
 
     // Start deployment
-    const vercelRes = await fetch("https://api.vercel.com/v13/deployments", {
+    const vercelEndpoint = "https://api.vercel.com/v13/deployments";
+
+    console.log("Vercel Deploy API Debug:");
+    console.log("- credential source/type: OAuth Access Token from userIntegrations");
+    console.log(`- masked token prefix: ${token.substring(0, 4)}...`);
+    console.log("- endpoint:", vercelEndpoint);
+
+    const vercelRes = await fetch(vercelEndpoint, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
@@ -83,8 +90,11 @@ export async function POST(req: Request) {
       }),
     });
 
+    console.log("- HTTP status:", vercelRes.status);
+
     if (!vercelRes.ok) {
       const err = await vercelRes.json();
+      console.log("- sanitized Vercel error body:", JSON.stringify(err.error));
       return new Response(`Vercel Deploy Error: ${err.error?.message || "Unknown error"}`, { status: 500 });
     }
 
