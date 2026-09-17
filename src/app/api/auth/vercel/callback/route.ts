@@ -42,7 +42,7 @@ export async function GET(req: Request) {
   }
 
   const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
-  const tokenEndpoint = "https://api.vercel.com/v2/oauth/access_token";
+  const tokenEndpoint = "https://api.vercel.com/login/oauth/token";
 
   // Safe server-side logging
   const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
