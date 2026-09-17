@@ -60,7 +60,16 @@ export async function GET(req: Request) {
     const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
     const tokenEndpoint = "https://api.vercel.com/v2/oauth/access_token";
 
+    const maskedClientId = clientId && clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short-or-missing";
+    const maskedSecret = clientSecret && clientSecret.length > 10 ? `...${clientSecret.substring(clientSecret.length - 4)}` : "too-short-or-missing";
+    
     console.log("Vercel Integration Token Exchange Debug:");
+    console.log("- integration client ID exists:", !!clientId);
+    console.log("- masked integration client ID:", maskedClientId);
+    console.log("- integration client secret exists:", !!clientSecret);
+    console.log("- masked secret fingerprint only:", maskedSecret);
+    console.log("- redirect URI:", redirectUri);
+    console.log("- token endpoint:", tokenEndpoint);
     console.log("- code exists:", !!code);
     console.log("- configurationId:", configurationId);
     console.log("- teamId:", teamId);
