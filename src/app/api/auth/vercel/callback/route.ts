@@ -4,6 +4,7 @@ import { userIntegrations } from "@/db/schema/settings";
 import { eq, and } from "drizzle-orm";
 import { encryptKey } from "@/lib/encryption";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -11,6 +12,8 @@ export async function GET(req: Request) {
   const configurationId = url.searchParams.get("configurationId");
   const teamId = url.searchParams.get("teamId");
   const nextParam = url.searchParams.get("next");
+  const state = url.searchParams.get("state");
+  const source = url.searchParams.get("source");
 
   const error = url.searchParams.get("error");
   const errorDescription = url.searchParams.get("error_description");
@@ -35,95 +38,147 @@ export async function GET(req: Request) {
     });
   }
 
-  const clientId = process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
-  const clientSecret = process.env.VERCEL_APP_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    return new Response("Vercel OAuth credentials not configured", { status: 500 });
-  }
-
-  const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
-  const tokenEndpoint = "https://api.vercel.com/login/oauth/token";
-  
   const cookieStore = await cookies();
-  const codeVerifier = cookieStore.get("oauth_code_verifier")?.value;
-
-  if (!codeVerifier) {
-    return new Response("Missing PKCE code verifier", { status: 400 });
-  }
-
-  // Safe server-side logging
-  const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
-  console.log("Vercel OAuth Token Exchange Debug:");
-  console.log("- NEXT_PUBLIC_VERCEL_APP_CLIENT_ID exists:", !!clientId);
-  console.log("- Masked Client ID:", maskedClientId);
-  console.log("- VERCEL_APP_CLIENT_SECRET exists:", !!clientSecret);
-  console.log("- oauth_code_verifier cookie exists:", !!codeVerifier);
-  console.log("- code_verifier length:", codeVerifier?.length || 0);
-  console.log("- token endpoint:", tokenEndpoint);
-  console.log("- redirect_uri:", redirectUri);
-  console.log("- authentication method: HTTP Basic Header");
-
-  try {
-    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
-    
-    const response = await fetch(tokenEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": `Basic ${basicAuth}`,
-      },
-      body: new URLSearchParams({
-        code: code,
-        redirect_uri: redirectUri,
-        grant_type: "authorization_code",
-        code_verifier: codeVerifier,
-      }),
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      const { encryptedKey: encryptedAccessToken, iv: accessIv } = encryptKey(data.access_token);
-      
-      // Clear the PKCE cookie
-      cookieStore.delete("oauth_code_verifier");
-
-      await db.delete(userIntegrations).where(
-        and(eq(userIntegrations.userId, session.user.id), eq(userIntegrations.provider, "vercel"))
-      );
-      
-      await db.insert(userIntegrations).values({
-        userId: session.user.id,
-        provider: "vercel",
-        providerAccountId: data.user_id || "vercel_user",
-        encryptedAccessToken,
-        accessIv,
-      });
-
-      // Redirect to the Configuration URL UI if configurationId exists (Marketplace install)
-      // Otherwise, redirect to the Dashboard Settings (In-app connection)
-      const redirectUrl = new URL(
-        configurationId ? "/vercel/configure" : "/dashboard/settings",
-        process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"
-      );
-      
-      if (configurationId) redirectUrl.searchParams.set("configurationId", configurationId);
-      if (teamId) redirectUrl.searchParams.set("teamId", teamId);
-      if (nextParam) redirectUrl.searchParams.set("next", nextParam);
-      
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: redirectUrl.toString(),
-        },
-      });
-    } else {
-      const err = await response.text();
-      console.error("Vercel OAuth Error:", err);
-      return new Response(`Failed to exchange token: ${err}`, { status: 400 });
+  const isIntegrationFlow = !!configurationId || source === "external";
+  
+  if (isIntegrationFlow) {
+    // -------------------------------------------------------------
+    // VERCEL INTEGRATION OAUTH FLOW
+    // -------------------------------------------------------------
+    const integrationState = cookieStore.get("vercel_integration_state")?.value;
+    if (state && state !== integrationState) {
+      return new Response("Invalid state parameter", { status: 400 });
     }
-  } catch (e) {
-    console.error("Failed to exchange Vercel code:", e);
-    return new Response("Internal Server Error during token exchange", { status: 500 });
+
+    const clientId = process.env.VERCEL_INTEGRATION_CLIENT_ID;
+    const clientSecret = process.env.VERCEL_INTEGRATION_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return new Response("Vercel Integration credentials not configured", { status: 500 });
+    }
+
+    const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
+    const tokenEndpoint = "https://api.vercel.com/v2/oauth/access_token";
+
+    console.log("Vercel Integration Token Exchange Debug:");
+    console.log("- code exists:", !!code);
+    console.log("- configurationId:", configurationId);
+    console.log("- teamId:", teamId);
+
+    try {
+      const response = await fetch(tokenEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: code,
+          redirect_uri: redirectUri,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const { encryptedKey: encryptedAccessToken, iv: accessIv } = encryptKey(data.access_token);
+        
+        cookieStore.delete("vercel_integration_state");
+
+        await db.delete(userIntegrations).where(
+          and(eq(userIntegrations.userId, session.user.id), eq(userIntegrations.provider, "vercel"))
+        );
+        
+        await db.insert(userIntegrations).values({
+          userId: session.user.id,
+          provider: "vercel",
+          providerAccountId: data.user_id || "vercel_integration_user",
+          configurationId: configurationId || null,
+          teamId: teamId || null,
+          encryptedAccessToken,
+          accessIv,
+        });
+
+        const nextUrl = nextParam || "/dashboard/settings";
+        return redirect(nextUrl);
+      } else {
+        const errData = await response.text();
+        console.error("Vercel Integration Token Exchange failed:", response.status, errData);
+        return new Response(`Failed to exchange token: ${errData}`, { status: response.status });
+      }
+    } catch (err: any) {
+      console.error("Token exchange exception:", err);
+      return new Response(`Error during token exchange: ${err.message}`, { status: 500 });
+    }
+  } else {
+    // -------------------------------------------------------------
+    // LEGACY SIGN IN WITH VERCEL APP FLOW (Retained for rollback)
+    // -------------------------------------------------------------
+    const clientId = process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID;
+    const clientSecret = process.env.VERCEL_APP_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return new Response("Vercel OAuth credentials not configured", { status: 500 });
+    }
+
+    const redirectUri = `${process.env.AUTH_URL || "https://aibuilderstudio.vercel.app"}/api/auth/vercel/callback`;
+    const tokenEndpoint = "https://api.vercel.com/login/oauth/token";
+    
+    const codeVerifier = cookieStore.get("oauth_code_verifier")?.value;
+
+    if (!codeVerifier) {
+      return new Response("Missing PKCE code verifier", { status: 400 });
+    }
+
+    const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
+    console.log("Vercel OAuth Token Exchange Debug:");
+    console.log("- NEXT_PUBLIC_VERCEL_APP_CLIENT_ID exists:", !!clientId);
+    console.log("- Masked Client ID:", maskedClientId);
+    
+    try {
+      const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      
+      const response = await fetch(tokenEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${basicAuth}`,
+        },
+        body: new URLSearchParams({
+          code: code,
+          redirect_uri: redirectUri,
+          grant_type: "authorization_code",
+          code_verifier: codeVerifier,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const { encryptedKey: encryptedAccessToken, iv: accessIv } = encryptKey(data.access_token);
+        
+        cookieStore.delete("oauth_code_verifier");
+
+        await db.delete(userIntegrations).where(
+          and(eq(userIntegrations.userId, session.user.id), eq(userIntegrations.provider, "vercel"))
+        );
+        
+        await db.insert(userIntegrations).values({
+          userId: session.user.id,
+          provider: "vercel",
+          providerAccountId: data.user_id || "vercel_user",
+          encryptedAccessToken,
+          accessIv,
+        });
+
+        return redirect("/dashboard/settings");
+      } else {
+        const errData = await response.text();
+        console.error("Token exchange failed:", response.status, errData);
+        return new Response(`Failed to exchange token: ${errData}`, { status: response.status });
+      }
+    } catch (err: any) {
+      console.error("Token exchange error:", err);
+      return new Response(`Error exchanging token: ${err.message}`, { status: 500 });
+    }
   }
 }

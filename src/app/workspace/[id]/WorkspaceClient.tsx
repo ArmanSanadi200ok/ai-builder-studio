@@ -441,10 +441,28 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
             <span className="material-symbols-outlined text-[16px]">stop_circle</span>
             Stop
           </Button>
-          <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" disabled={displayStatus === "generated_with_errors"} onClick={handleDeploy}>
-            <span className="material-symbols-outlined text-[16px]">publish</span>
-            Deploy
-          </Button>
+          {project.applicationType === "MOBILE_APP" ? (
+            <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" onClick={() => alert("Download the source code from the Files tab to build using EAS or a mobile build service.")}>
+              <span className="material-symbols-outlined text-[16px]">download</span>
+              Mobile Build Flow
+            </Button>
+          ) : project.applicationType === "WHATSAPP_BOT" ? (
+            <>
+              <Button className="ml-sm gap-xs bg-[#25D366]" size="sm" onClick={() => alert("WhatsApp Webhook configuration coming soon.")}>
+                <span className="material-symbols-outlined text-[16px]">chat</span>
+                WhatsApp Config
+              </Button>
+              <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" disabled={displayStatus === "generated_with_errors"} onClick={handleDeploy}>
+                <span className="material-symbols-outlined text-[16px]">cloud</span>
+                Deploy Backend
+              </Button>
+            </>
+          ) : (
+            <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" disabled={displayStatus === "generated_with_errors"} onClick={handleDeploy}>
+              <span className="material-symbols-outlined text-[16px]">publish</span>
+              Deploy to Vercel
+            </Button>
+          )}
         </div>
       </header>
 

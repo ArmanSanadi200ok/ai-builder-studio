@@ -67,44 +67,39 @@ export async function POST(req: Request) {
       data: f.content
     }));
 
-    // Introspect the token to verify its validity and scopes
-    const clientId = process.env.NEXT_PUBLIC_VERCEL_APP_CLIENT_ID || "";
-    const clientSecret = process.env.VERCEL_APP_CLIENT_SECRET || "";
-    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+    const projectName = project.name.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 52);
+    const teamId = integration.teamId;
+    const teamQuery = teamId ? `?teamId=${teamId}` : "";
 
-    const introspectionRes = await fetch("https://api.vercel.com/login/oauth/token/introspect", {
+    console.log("Vercel Deploy API Debug (Integration Flow):");
+    console.log("- credential source/type: Vercel Integration Access Token");
+    console.log(`- teamId context: ${teamId || "Personal Account"}`);
+
+    // 1. Create Project
+    const createProjectEndpoint = `https://api.vercel.com/v9/projects${teamQuery}`;
+    const projectRes = await fetch(createProjectEndpoint, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Authorization": `Basic ${basicAuth}`,
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      body: new URLSearchParams({ token: token }),
+      body: JSON.stringify({
+        name: projectName,
+        framework: "nextjs",
+      }),
     });
 
-    let introspectionData: any = {};
-    if (introspectionRes.ok) {
-      introspectionData = await introspectionRes.json();
+    if (!projectRes.ok) {
+      const err = await projectRes.json();
+      // 409 means project already exists, which is fine
+      if (projectRes.status !== 409) {
+        console.log("- sanitized Vercel project creation error body:", JSON.stringify(err.error));
+        return new Response(`Vercel Project Creation Error: ${err.error?.message || "Unknown error"}`, { status: 500 });
+      }
     }
 
-    // Start deployment
-    const vercelEndpoint = "https://api.vercel.com/v13/deployments";
-
-    const maskedPrefix = token.startsWith('vca_') ? 'vca_***' : token.startsWith('vci_') ? 'vci_***' : 'other_***';
-    const maskedClientId = clientId.length > 10 ? `${clientId.substring(0, 6)}...${clientId.substring(clientId.length - 4)}` : "too-short";
-    
-    console.log("Vercel Deploy API Debug:");
-    console.log("- credential source/type: OAuth Access Token from userIntegrations");
-    console.log(`- masked token prefix: ${maskedPrefix}`);
-    console.log(`- token validity/expiry handling: None currently implemented in deploy route. Token may be expired if short-lived.`);
-    console.log(`- refresh token stored: ${!!integration.encryptedRefreshToken}`);
-    console.log(`- token active (introspection): ${introspectionData.active}`);
-    console.log(`- client_id (masked): ${maskedClientId}`);
-    console.log(`- token expiry timestamp: ${introspectionData.exp}`);
-    console.log(`- requested scopes/permissions: ${introspectionData.scope || "none"}`);
-    console.log("- endpoint URL:", vercelEndpoint);
-    console.log("- HTTP method: POST");
-    console.log("- teamId/ownership context: None explicitly passed, defaults to personal account");
-
+    // 2. Start deployment
+    const vercelEndpoint = `https://api.vercel.com/v13/deployments${teamQuery}`;
     const vercelRes = await fetch(vercelEndpoint, {
       method: "POST",
       headers: {
@@ -112,7 +107,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        name: project.name.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 52),
+        name: projectName,
         projectSettings: {
           framework: "nextjs"
         },

@@ -22,6 +22,8 @@ export const userIntegrations = pgTable("user_integration", {
     .references(() => users.id, { onDelete: "cascade" }),
   provider: text("provider").notNull(), // 'github_integration', 'vercel'
   providerAccountId: text("providerAccountId").notNull(),
+  configurationId: text("configurationId"),
+  teamId: text("teamId"),
   encryptedAccessToken: text("encryptedAccessToken").notNull(),
   accessIv: text("accessIv").notNull(),
   encryptedRefreshToken: text("encryptedRefreshToken"),
