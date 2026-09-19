@@ -74,6 +74,8 @@ export async function GET(req: Request) {
     console.log("- configurationId:", configurationId);
     console.log("- teamId:", teamId);
 
+    let redirectDestination: string | undefined;
+
     try {
       const response = await fetch(tokenEndpoint, {
         method: "POST",
@@ -90,6 +92,13 @@ export async function GET(req: Request) {
 
       if (response.ok) {
         const data = await response.json();
+        
+        console.log("Vercel Integration Token Exchange Success:");
+        console.log("- token exchange HTTP status:", response.status);
+        console.log("- token received:", !!data.access_token);
+        console.log("- configurationId present:", !!configurationId);
+        console.log("- teamId present:", !!teamId);
+
         const { encryptedKey: encryptedAccessToken, iv: accessIv } = encryptKey(data.access_token);
         
         cookieStore.delete("vercel_integration_state");
@@ -108,8 +117,20 @@ export async function GET(req: Request) {
           accessIv,
         });
 
-        const nextUrl = nextParam || "/dashboard/settings";
-        return redirect(nextUrl);
+        let nextUrl = nextParam || "/dashboard/settings";
+        if (nextUrl.startsWith("http")) {
+          try {
+            const parsed = new URL(nextUrl);
+            if (!parsed.hostname.endsWith("vercel.com")) {
+              nextUrl = "/dashboard/settings";
+            }
+          } catch {
+            nextUrl = "/dashboard/settings";
+          }
+        }
+        
+        console.log("- redirect destination origin only:", nextUrl.startsWith("http") ? new URL(nextUrl).origin : "relative");
+        redirectDestination = nextUrl;
       } else {
         const errData = await response.text();
         console.error("Vercel Integration Token Exchange failed:", response.status, errData);
@@ -118,6 +139,10 @@ export async function GET(req: Request) {
     } catch (err: any) {
       console.error("Token exchange exception:", err);
       return new Response(`Error during token exchange: ${err.message}`, { status: 500 });
+    }
+
+    if (redirectDestination) {
+      return redirect(redirectDestination);
     }
   } else {
     // -------------------------------------------------------------
