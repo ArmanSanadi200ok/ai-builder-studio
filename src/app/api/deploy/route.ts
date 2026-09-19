@@ -67,6 +67,35 @@ export async function POST(req: Request) {
       data: f.content
     }));
 
+    // Framework Detection
+    let detectedFramework: string | null = null;
+    let hasPackageJson = false;
+    let hasNextDependency = false;
+    let hasViteDependency = false;
+    
+    const packageJsonFile = files.find((f: { path: string; content: string }) => f.path === "package.json" || f.path === "/package.json");
+    if (packageJsonFile) {
+        hasPackageJson = true;
+        try {
+            const pkg = JSON.parse(packageJsonFile.content);
+            const deps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+            if (deps.next) {
+                hasNextDependency = true;
+                detectedFramework = "nextjs";
+            } else if (deps.vite) {
+                hasViteDependency = true;
+                detectedFramework = "vite";
+            } else {
+                detectedFramework = null; // default Node or other
+            }
+        } catch (e) {
+            console.error("Failed to parse package.json for framework detection");
+        }
+    } else {
+        // No package.json, assume static html
+        detectedFramework = null;
+    }
+
     const projectName = project.name.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 52);
     const teamId = integration.teamId;
     const teamQuery = teamId ? `?teamId=${teamId}` : "";
@@ -74,6 +103,10 @@ export async function POST(req: Request) {
     console.log("Vercel Deploy API Debug (Integration Flow):");
     console.log("- credential source/type: Vercel Integration Access Token");
     console.log(`- teamId context: ${teamId || "Personal Account"}`);
+    console.log(`- detected framework: ${detectedFramework || "STATIC_HTML"}`);
+    console.log(`- package.json: ${hasPackageJson}`);
+    console.log(`- next dependency: ${hasNextDependency}`);
+    console.log(`- file manifest count: ${vercelFiles.length}`);
 
     // 1. Create Project
     const createProjectEndpoint = `https://api.vercel.com/v9/projects${teamQuery}`;
@@ -85,7 +118,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         name: projectName,
-        framework: "nextjs",
+        framework: detectedFramework,
       }),
     });
 
@@ -109,7 +142,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         name: projectName,
         projectSettings: {
-          framework: "nextjs"
+          framework: detectedFramework
         },
         files: vercelFiles,
       }),
