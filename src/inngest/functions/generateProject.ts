@@ -7,6 +7,8 @@ import { decryptKey } from "@/lib/encryption";
 import { aiProviders, getLiveModels, ProviderModel } from "@/lib/ai/registry";
 import { NonRetriableError } from "inngest";
 import { executeWithProviderChain } from "@/lib/ai/provider-chain";
+import { validateAndRepairProject } from "@/lib/projectValidator";
+import { preflightBuild } from "@/lib/projectBuilder";
 
 export const generateProject = inngest.createFunction(
   { 
@@ -384,18 +386,53 @@ Output JSON format exactly like this (no markdown wrapping):
         generatedFiles.push({ path: file.path, error: (fileResult as any).error });
       }
 
+      let buildPassed = false;
+      let finalBuildError = "";
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        // 5. Deterministic Repair & Validation
+        await step.run(`preflight-validate-${attempt}`, async () => {
+          await db.update(projectJobs).set({ status: "VALIDATING", currentStep: `Validating Project files (Attempt ${attempt + 1})`, updatedAt: new Date() }).where(eq(projectJobs.id, job.id));
+          await validateAndRepairProject(versionId);
+        });
+
+        // 6. Preflight Build
+        const buildResult = await step.run(`preflight-build-${attempt}`, async () => {
+          await db.update(projectJobs).set({ status: "BUILDING", currentStep: `Running preflight build (Attempt ${attempt + 1})`, updatedAt: new Date() }).where(eq(projectJobs.id, job.id));
+          return await preflightBuild(versionId);
+        });
+
+        if (buildResult.success) {
+          buildPassed = true;
+          break;
+        } else {
+          finalBuildError = buildResult.error || "Unknown build error";
+          if (attempt < 2) {
+             // In a full implementation, we'd call the LLM here to fix the build error.
+             // For now we just loop and let deterministic repairs catch what they can, 
+             // but if deterministic fails, it will eventually fail.
+             await step.run(`preflight-repair-${attempt}`, async () => {
+               await db.update(projectJobs).set({ status: "REPAIRING", currentStep: `Repairing build error (Attempt ${attempt + 1})`, updatedAt: new Date() }).where(eq(projectJobs.id, job.id));
+               // Currently deterministic repair runs on the next iteration
+             });
+          }
+        }
+      }
+
       await step.run("finalize", async () => {
-        const hasErrors = generatedFiles.some(f => f.error);
+        const hasErrors = generatedFiles.some(f => f.error) || !buildPassed;
         const finalStatus = hasErrors ? "GENERATED_WITH_ERRORS" : "COMPLETED";
         
         await db.update(projectJobs).set({ 
           status: finalStatus, 
-          currentStep: "Complete", 
+          currentStep: hasErrors && !buildPassed ? `Build Failed: ${finalBuildError}` : "Complete", 
+          errorMessage: !buildPassed ? finalBuildError : null,
           completedAt: new Date(),
           updatedAt: new Date(),
         }).where(eq(projectJobs.id, job.id));
         
-        await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
+        const finalProjectStatus = buildPassed ? "ready" : "failed";
+        await db.update(projects).set({ status: finalProjectStatus }).where(eq(projects.id, projectId));
       });
 
     } catch (error: any) {
