@@ -258,17 +258,32 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   };
 
   const handleDeploy = async () => {
+    console.log("[Diagnostics] Deploy button clicked");
+    console.log("[Diagnostics] Project ID:", project.id);
+    console.log("[Diagnostics] Application Type:", project.applicationType);
+    console.log("[Diagnostics] Display Status:", displayStatus);
+    
     try {
+      console.log("[Diagnostics] Request started to /api/deploy");
       const res = await fetch("/api/deploy", { 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId: project.id })
       });
+      console.log("[Diagnostics] Request finished. Status:", res.status);
       if (!res.ok) {
         const errTxt = await res.text();
+        console.error("[Diagnostics] Response error body:", errTxt);
         setError(errTxt);
+      } else {
+        const data = await res.json();
+        console.log("[Diagnostics] Response success body:", data);
+        if (data.url) {
+           window.open(`https://${data.url}`, '_blank');
+        }
       }
     } catch (err: any) {
+      console.error("[Diagnostics] Network or unexpected error:", err);
       setError("Deploy error. Please try again.");
     }
   };
@@ -458,7 +473,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
               </Button>
             </>
           ) : (
-            <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" disabled={displayStatus === "generated_with_errors"} onClick={handleDeploy}>
+            <Button className="ml-sm gap-xs bg-[#00a2e6]" size="sm" type="button" disabled={displayStatus === "generated_with_errors"} onClick={handleDeploy}>
               <span className="material-symbols-outlined text-[16px]">publish</span>
               Deploy to Vercel
             </Button>

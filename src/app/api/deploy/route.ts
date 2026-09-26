@@ -6,13 +6,16 @@ import { eq, and } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
 
 export async function POST(req: Request) {
+  console.log("[Diagnostics Backend] /api/deploy route entered");
   try {
     const session = await auth();
+    console.log("[Diagnostics Backend] Authenticated user:", !!session?.user?.id);
     if (!session?.user?.id) {
       return new Response("Unauthorized", { status: 401 });
     }
 
     const { projectId } = await req.json();
+    console.log("[Diagnostics Backend] Project ID requested:", projectId);
     if (!projectId) {
       return new Response("Missing projectId", { status: 400 });
     }
@@ -39,6 +42,12 @@ export async function POST(req: Request) {
       where: eq(projects.id, projectId)
     });
 
+    console.log("[Diagnostics Backend] Project found:", !!project);
+    if (project) {
+       console.log("[Diagnostics Backend] Project Status:", project.status);
+       console.log("[Diagnostics Backend] Project ApplicationType:", project.applicationType);
+    }
+
     if (!project) {
       return new Response("Project not found", { status: 404 });
     }
@@ -56,6 +65,8 @@ export async function POST(req: Request) {
     const files = await db.query.projectFiles.findMany({
       where: eq(projectFiles.versionId, latestVersion.id)
     });
+    
+    console.log("[Diagnostics Backend] ProjectFiles count:", files?.length || 0);
 
     if (!files || files.length === 0) {
       return new Response("No files found", { status: 404 });
@@ -96,7 +107,9 @@ export async function POST(req: Request) {
         detectedFramework = null;
     }
 
-    const projectName = project.name.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 52);
+    const baseName = project.name.toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 40);
+    const shortId = project.id.split('-')[0];
+    const generatedProjectName = `${baseName}-${shortId}`.replace(/-+$/, '');
     const teamId = integration.teamId;
     const teamQuery = teamId ? `?teamId=${teamId}` : "";
 
@@ -108,30 +121,63 @@ export async function POST(req: Request) {
     console.log(`- next dependency: ${hasNextDependency}`);
     console.log(`- file manifest count: ${vercelFiles.length}`);
 
-    // 1. Create Project
-    const createProjectEndpoint = `https://api.vercel.com/v9/projects${teamQuery}`;
-    const projectRes = await fetch(createProjectEndpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name: projectName,
-        framework: detectedFramework,
-      }),
-    });
+    console.log("[Diagnostics Backend] ABS Project ID:", project.id);
+    console.log("[Diagnostics Backend] Generated Vercel project name:", generatedProjectName);
+    console.log("[Diagnostics Backend] Stored Vercel project ID:", project.vercelProjectId || "None");
 
-    if (!projectRes.ok) {
-      const err = await projectRes.json();
-      // 409 means project already exists, which is fine
-      if (projectRes.status !== 409) {
+    let targetVercelProjectId = project.vercelProjectId;
+    let deployProjectName = generatedProjectName;
+
+    if (!targetVercelProjectId) {
+      // 1. Create Project
+      console.log("[Diagnostics Backend] create-project request started to Vercel API (creating new)");
+      const createProjectEndpoint = `https://api.vercel.com/v9/projects${teamQuery}`;
+      const projectRes = await fetch(createProjectEndpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: generatedProjectName,
+          framework: detectedFramework,
+        }),
+      });
+
+      if (!projectRes.ok) {
+        const err = await projectRes.json();
+        console.log("[Diagnostics Backend] create-project HTTP status:", projectRes.status, "Error:", err.error?.code);
+        
+        if (projectRes.status === 409) {
+          return new Response(`Vercel Project Creation Conflict: The name '${generatedProjectName}' is already taken on Vercel. Please rename your project or try again.`, { status: 409 });
+        }
+        
         console.log("- sanitized Vercel project creation error body:", JSON.stringify(err.error));
         return new Response(`Vercel Project Creation Error: ${err.error?.message || "Unknown error"}`, { status: 500 });
+      }
+
+      console.log("[Diagnostics Backend] create-project HTTP status:", projectRes.status, "(Success)");
+      const projectData = await projectRes.json();
+      targetVercelProjectId = projectData.id;
+      
+      await db.update(projects).set({ vercelProjectId: targetVercelProjectId }).where(eq(projects.id, projectId));
+    } else {
+      console.log("[Diagnostics Backend] Reusing existing Vercel Project ID:", targetVercelProjectId);
+      // Fetch current Vercel project name to ensure we deploy to the correct project
+      const projCheck = await fetch(`https://api.vercel.com/v9/projects/${targetVercelProjectId}${teamQuery}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (projCheck.ok) {
+        const pd = await projCheck.json();
+        deployProjectName = pd.name;
+        console.log("[Diagnostics Backend] Retrieved current Vercel project name:", deployProjectName);
+      } else {
+        console.log("[Diagnostics Backend] Failed to fetch existing Vercel project details. Status:", projCheck.status);
       }
     }
 
     // 2. Start deployment
+    console.log("[Diagnostics Backend] deployment request started to Vercel API");
     const vercelEndpoint = `https://api.vercel.com/v13/deployments${teamQuery}`;
     const vercelRes = await fetch(vercelEndpoint, {
       method: "POST",
@@ -140,7 +186,7 @@ export async function POST(req: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        name: projectName,
+        name: deployProjectName,
         projectSettings: {
           framework: detectedFramework
         },
@@ -148,6 +194,7 @@ export async function POST(req: Request) {
       }),
     });
 
+    console.log("[Diagnostics Backend] deployment HTTP status:", vercelRes.status);
     console.log("- HTTP status:", vercelRes.status);
 
     if (!vercelRes.ok) {
@@ -157,9 +204,14 @@ export async function POST(req: Request) {
     }
 
     const deployData = await vercelRes.json();
+    console.log("[Diagnostics Backend] Deployment Status:", deployData.readyState || "QUEUED");
 
-    // Update project status to deployed
-    await db.update(projects).set({ status: "deployed", updatedAt: new Date() }).where(eq(projects.id, projectId));
+    // Update project status to deployed and save deploy URL
+    await db.update(projects).set({ 
+      status: "deployed", 
+      vercelDeployUrl: deployData.url,
+      updatedAt: new Date() 
+    }).where(eq(projects.id, projectId));
 
     return new Response(JSON.stringify({ url: deployData.url }), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch (err: any) {
