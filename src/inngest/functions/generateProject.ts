@@ -391,10 +391,61 @@ Output JSON format exactly like this (no markdown wrapping):
 
       for (let attempt = 0; attempt < 3; attempt++) {
         // 5. Deterministic Repair & Validation
-        await step.run(`preflight-validate-${attempt}`, async () => {
+        const valResult = await step.run(`preflight-validate-${attempt}`, async () => {
           await db.update(projectJobs).set({ status: "VALIDATING", currentStep: `Validating Project files (Attempt ${attempt + 1})`, updatedAt: new Date() }).where(eq(projectJobs.id, job.id));
-          await validateAndRepairProject(versionId);
+          return await validateAndRepairProject(versionId);
         });
+
+        // 5.5. AI Repair for missing local imports
+        if (valResult.missingImports && valResult.missingImports.length > 0) {
+          await step.run(`preflight-ai-repair-${attempt}`, async () => {
+            await db.update(projectJobs).set({ status: "REPAIRING", currentStep: `Generating missing local imports (Attempt ${attempt + 1})`, updatedAt: new Date() }).where(eq(projectJobs.id, job.id));
+            
+            // Get credentials for first fallback provider
+            let apiKey = "";
+            let providerId = providerChain[0].providerId;
+            let modelId = providerChain[0].modelId;
+            const { getDecryptedKey, makeProviderRequest } = await import("@/lib/ai/provider-chain");
+            
+            for (const p of providerChain) {
+              const key = await getDecryptedKey(p.providerId, userId);
+              if (key) {
+                apiKey = key;
+                providerId = p.providerId;
+                modelId = p.modelId;
+                break;
+              }
+            }
+
+            if (apiKey) {
+              for (const missing of valResult.missingImports) {
+                try {
+                  const isCss = missing.expectedPath.endsWith('.css');
+                  const prompt = `You are an expert developer repairing a missing local file in a project.
+The project tried to import '${missing.importPath}' from '${missing.importingFile}'.
+The expected file path is: ${missing.expectedPath}.
+
+Please generate the complete content for this missing file.
+${isCss ? "IMPORTANT: This is a CSS file. Provide a beautiful, robust styling implementation that a premium web application would use. Do NOT output an empty file." : "Provide the complete implementation needed for this import to work correctly."}
+Output ONLY the raw file content. Do NOT wrap in markdown \`\`\` blocks.`;
+
+                  const content = await makeProviderRequest(providerId, modelId, apiKey, prompt, false, true);
+                  
+                  if (content && content.length > 5) {
+                    await db.insert(projectFiles).values({
+                      versionId,
+                      path: missing.expectedPath,
+                      content: content
+                    });
+                  }
+                } catch (e) {
+                  console.error("Failed to AI-repair missing import", missing.expectedPath, e);
+                }
+              }
+            }
+          });
+        }
+
 
         // 6. Preflight Build
         const buildResult = await step.run(`preflight-build-${attempt}`, async () => {

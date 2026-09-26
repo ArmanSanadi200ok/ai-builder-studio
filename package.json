@@ -19,6 +19,7 @@
     "inngest": "^4.18.1",
     "next": "16.3.0",
     "next-auth": "^5.0.0-beta.32",
+    "path-browserify": "^1.0.1",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -26,6 +27,7 @@
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/path-browserify": "^1.0.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.4.2",
