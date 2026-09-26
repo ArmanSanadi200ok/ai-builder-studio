@@ -11,6 +11,19 @@ import {
   getDevCommand 
 } from "@/lib/preview/sandbox";
 
+function getProjectRootDir(files: { path: string }[]): string {
+  const rootFiles = ['package.json', 'index.html'];
+  for (const rootFile of rootFiles) {
+    const file = files.find(f => f.path.toLowerCase().endsWith(rootFile));
+    if (file) {
+      let dir = file.path.substring(0, file.path.length - rootFile.length);
+      dir = dir.replace(/^\/+/, '').replace(/\/+$/, '');
+      return dir;
+    }
+  }
+  return '';
+}
+
 async function safeSandboxOperation<T>(sandbox: any, op: () => Promise<T>): Promise<T> {
   try {
     return await op();
@@ -135,7 +148,12 @@ export const startPreviewSandbox = inngest.createFunction(
           if (!sandbox) throw new Error("Sandbox lost");
 
           const installResult = await safeSandboxOperation(sandbox, async () => {
-             return await sandbox.runCommand(packageManager, ["install"]);
+             const projectRootDir = getProjectRootDir(files);
+             const fullInstallCmd = projectRootDir ? `cd ${projectRootDir} && ${packageManager} install` : `${packageManager} install`;
+             return await sandbox.runCommand({
+               cmd: "sh",
+               args: ["-c", fullInstallCmd]
+             });
           });
           
           if (installResult.exitCode !== 0) {
@@ -184,12 +202,23 @@ export const startPreviewSandbox = inngest.createFunction(
             await sandbox.runCommand({ cmd: "sh", args: ["-c", `kill -9 $(lsof -t -i:${targetPort}) 2>/dev/null || true`] });
           });
           
+          const projectRootDir = getProjectRootDir(files);
+          const cwdPath = projectRootDir ? `/vercel/${projectRootDir}` : `/vercel`;
+          
+          console.log(`[Preview] Diagnostics for sandbox ${sandboxInfo.name}:`);
+          console.log(`Preview root directory: ${projectRootDir || '/'}`);
+          console.log(`Current working directory: ${cwdPath}`);
+          console.log(`Project files synced: ${files.length}`);
+          console.log(`package.json exists: ${files.some(f => f.path.toLowerCase().endsWith('package.json'))}`);
+          console.log(`index.html exists: ${files.some(f => f.path.toLowerCase().endsWith('index.html'))}`);
+
           const devCommand = getDevCommand(packageManager, framework, files, targetPort);
+          const fullCmd = projectRootDir ? `cd ${projectRootDir} && ${devCommand}` : devCommand;
           
           devCmd = await safeSandboxOperation(sandbox, async () => {
             return await sandbox.runCommand({
               cmd: "sh",
-              args: ["-c", devCommand],
+              args: ["-c", fullCmd],
               detached: true
             });
           });
