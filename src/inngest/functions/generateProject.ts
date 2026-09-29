@@ -12,6 +12,28 @@ import { preflightBuild } from "@/lib/projectBuilder";
 import { runRuntimeTest } from "@/lib/runtimeTest";
 import { finalReview } from "@/lib/finalReviewer";
 import { startPreviewSandbox } from "./startPreview";
+
+/**
+ * Generate deterministic fallback content for non-runtime documentation files.
+ * Used when LLM generation fails for files that should not block the project.
+ */
+function generateDeterministicFallback(basename: string, projectPrompt: string): string {
+  switch (basename) {
+    case 'README.md':
+      return `# Project\n\n${projectPrompt}\n\n## Getting Started\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\n## Built With\n\n- React\n- TypeScript\n- Vite\n`;
+    case '.gitignore':
+      return `node_modules/\ndist/\n.env\n.env.local\n*.log\n.DS_Store\n`;
+    case 'LICENSE':
+      return `MIT License\n\nCopyright (c) ${new Date().getFullYear()}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software.\n`;
+    case 'CHANGELOG.md':
+      return `# Changelog\n\n## 1.0.0\n\n- Initial release\n`;
+    case '.editorconfig':
+      return `root = true\n\n[*]\nindent_style = space\nindent_size = 2\nend_of_line = lf\ncharset = utf-8\ntrim_trailing_whitespace = true\ninsert_final_newline = true\n`;
+    default:
+      return `// Auto-generated fallback for ${basename}\n`;
+  }
+}
+
 export const generateProject = inngest.createFunction(
   { 
     id: "generate-project", 
@@ -281,6 +303,11 @@ Output JSON format exactly like this (no markdown wrapping):
             return { path: file.path, success: true, action: "delete" };
           }
 
+          // Identify non-runtime documentation files that should not be single-point failures
+          const NON_RUNTIME_FILES = ['README.md', 'LICENSE', '.gitignore', 'CHANGELOG.md', '.editorconfig'];
+          const basename = file.path.split('/').pop() || file.path;
+          const isNonRuntimeFile = NON_RUNTIME_FILES.includes(basename);
+
           const filePrompt = "You are an expert developer implementing a project.\n" +
 "Project Request: " + prompt + (plan.contextText || "") + "\n" +
 "Your task is to write the complete content for the file: " + file.path + "\n" +
@@ -301,17 +328,31 @@ Output JSON format exactly like this (no markdown wrapping):
               attemptPrompt += `\n\nYour previous code failed validation with this error:\n${syntaxErrorMsg}\nPlease fix the error and return the corrected JSON.`;
             }
 
-            const { content } = await executeWithProviderChain(
-               job.id,
-               projectId,
-               providerChain,
-               userId,
-               attemptPrompt,
-               isJsonFormat,
-               `Generating ${file.path} (${i + 1}/${filesToGenerate.length}) ${attempt > 0 ? '[Repairing]' : ''}`,
-               "execution",
-               file.path
-            );
+            let content: string;
+            try {
+              const result = await executeWithProviderChain(
+                 job.id,
+                 projectId,
+                 providerChain,
+                 userId,
+                 attemptPrompt,
+                 isJsonFormat,
+                 `Generating ${file.path} (${i + 1}/${filesToGenerate.length}) ${attempt > 0 ? '[Repairing]' : ''}`,
+                 "execution",
+                 file.path
+              );
+              content = result.content;
+            } catch (providerErr: unknown) {
+              // If this is a non-runtime file, use a deterministic fallback instead of failing
+              if (isNonRuntimeFile) {
+                console.log(`[Generation] Non-runtime file ${file.path} failed LLM generation, using deterministic fallback.`);
+                finalContent = generateDeterministicFallback(basename, prompt);
+                syntaxErrorMsg = "";
+                break;
+              }
+              // For runtime files, propagate the error
+              throw providerErr;
+            }
             
             try {
               const parsed = JSON.parse(content);
@@ -335,7 +376,7 @@ Output JSON format exactly like this (no markdown wrapping):
               if (file.path.endsWith('.json') || file.path.toLowerCase() === 'package.json') {
                 try {
                   JSON.parse(finalContent);
-                } catch (e) {
+                } catch {
                   syntaxErrorMsg = "Invalid JSON structure for a JSON file.";
                 }
               } else if (file.path.endsWith('.html')) {
@@ -373,6 +414,11 @@ Output JSON format exactly like this (no markdown wrapping):
               await new Promise(r => setTimeout(r, 2000));
               continue;
             } else if (syntaxErrorMsg) {
+              // If non-runtime file fails validation, use deterministic fallback
+              if (isNonRuntimeFile) {
+                finalContent = generateDeterministicFallback(basename, prompt);
+                syntaxErrorMsg = "";
+              }
               break; 
             }
             

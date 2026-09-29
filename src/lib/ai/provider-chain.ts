@@ -100,6 +100,41 @@ export async function makeProviderRequest(providerId: string, modelId: string, a
   }
 }
 
+/**
+ * Attempt to extract valid JSON from an LLM response that may contain
+ * markdown fences, conversational preamble, or trailing commentary.
+ */
+function extractJson(raw: string): string {
+  let content = raw;
+
+  // 1. Strip markdown code fence wrapping
+  const fenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenceMatch) {
+    content = fenceMatch[1].trim();
+  }
+
+  // 2. Strip conversational preamble before the first { or [
+  const firstBrace = content.indexOf('{');
+  const firstBracket = content.indexOf('[');
+  if (firstBrace > 0 || firstBracket > 0) {
+    const candidates = [firstBrace, firstBracket].filter(i => i >= 0);
+    const idx = Math.min(...candidates);
+    if (idx > 0) {
+      content = content.slice(idx);
+    }
+  }
+
+  // 3. Strip trailing commentary after last } or ]
+  const lastBrace = content.lastIndexOf('}');
+  const lastBracket = content.lastIndexOf(']');
+  const lastIdx = Math.max(lastBrace, lastBracket);
+  if (lastIdx >= 0 && lastIdx < content.length - 1) {
+    content = content.slice(0, lastIdx + 1);
+  }
+
+  return content;
+}
+
 export async function executeWithProviderChain(
   jobId: string,
   projectId: string,
@@ -137,7 +172,7 @@ export async function executeWithProviderChain(
     let attempt = 0;
     let providerExhausted = false;
 
-    while (attempt < 2 && !providerExhausted) {
+    while (attempt < 3 && !providerExhausted) {
       // Check global timeout boundary again inside the loop
       if (Date.now() - globalStartTime > GLOBAL_TIMEOUT_MS) {
          throw new NonRetriableError(`Generation exceeded safety timeout of 3 minutes. Please try again.`);
@@ -172,15 +207,7 @@ export async function executeWithProviderChain(
 
         if (isJson) {
            if (content !== null && content !== undefined) {
-             const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-             if (jsonMatch) {
-               content = jsonMatch[1].trim();
-             } else {
-               const braceMatch = content.match(/(\{|\[)[\s\S]*(\}|\])/);
-               if (braceMatch) {
-                 content = braceMatch[0];
-               }
-             }
+             content = extractJson(content);
            }
            
            try {
@@ -254,7 +281,17 @@ export async function executeWithProviderChain(
         
         if (status === 400) {
            if (code === "malformed_json") {
-             if (attempt < 2) {
+             if (attempt < 3) {
+               // On the third attempt, try rotating to a different model within the same provider
+               if (attempt === 2) {
+                 try {
+                   const liveModels = await getLiveModels(providerId, apiKey as string);
+                   const available = liveModels.filter(m => m.isAvailable && m.id !== modelId);
+                   if (available.length > 0) {
+                     modelId = available[0].id;
+                   }
+                 } catch {}
+               }
                attemptHistory.push(record);
                await new Promise(r => setTimeout(r, 2000 * attempt));
                continue;
@@ -272,7 +309,7 @@ export async function executeWithProviderChain(
         }
 
         if (status === 408 || status === 429 || status >= 500) {
-           if (attempt < 2) {
+           if (attempt < 3) {
              attemptHistory.push(record);
              await new Promise(r => setTimeout(r, 2000 * attempt));
              continue;
