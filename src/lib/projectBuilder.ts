@@ -58,8 +58,8 @@ export async function preflightBuild(versionId: string): Promise<{ success: bool
       await fs.writeFile(filePath, file.content, "utf8");
     }
 
-    // Run npm install
-    await execAsync(`npm install --no-fund --no-audit --legacy-peer-deps --cache=${path.join(tmpDir, '.npm')}`, { cwd: tmpDir, timeout: 60000 });
+    // Run npm install (force dev dependencies even in Vercel's production environment)
+    await execAsync(`npm install --no-fund --no-audit --legacy-peer-deps --include=dev --cache=${path.join(tmpDir, '.npm')}`, { cwd: tmpDir, timeout: 60000, env: { ...process.env, NODE_ENV: 'development' } });
     
     // Run npm run build
     await execAsync('npm run build', { cwd: tmpDir, timeout: 60000 });
