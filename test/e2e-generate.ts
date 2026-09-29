@@ -1,9 +1,9 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 import { db } from "../src/db";
-import { projects, projectJobs } from "../src/db/schema/projects";
+import { projects, projectJobs, projectVersions } from "../src/db/schema/projects";
 import { inngest } from "../src/inngest/client";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import crypto from "crypto";
 
 async function runE2E() {
@@ -37,8 +37,10 @@ async function runE2E() {
 
   console.log("Waiting for project to become ready (this may take a few minutes)...");
   
-  let finalProject;
-  let finalJob;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let finalProject: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let finalJob: any;
   
   while (true) {
     const proj = await db.query.projects.findFirst({
@@ -47,7 +49,7 @@ async function runE2E() {
     
     const projJobs = await db.query.projectJobs.findMany({
       where: eq(projectJobs.projectId, projectId),
-      orderBy: (jobs, { desc }) => [desc(jobs.createdAt)],
+      orderBy: (jobs, { desc: d }) => [d(jobs.createdAt)],
       limit: 1
     });
     
@@ -64,11 +66,19 @@ async function runE2E() {
     await new Promise(r => setTimeout(r, 10000));
   }
 
+  // Get the latest version for this project
+  const latestVersion = await db.query.projectVersions.findFirst({
+    where: eq(projectVersions.projectId, projectId),
+    orderBy: [desc(projectVersions.versionNumber)],
+  });
+
   console.log("\n=== E2E RESULT ===");
   console.log("Final Project Status:", finalProject.status);
   console.log("ProjectId:", finalProject.id);
   console.log("JobId:", finalJob?.id);
+  console.log("VersionId:", latestVersion?.id);
   console.log("Repair Count:", finalJob?.repairCount);
+  console.log("Build Result:", finalJob?.status === "COMPLETED" ? "PASS" : finalJob?.status);
   console.log("SandboxId:", finalProject.sandboxId);
   console.log("SandboxName:", finalProject.sandboxName);
   console.log("PreviewUrl:", finalProject.previewUrl);
@@ -76,6 +86,12 @@ async function runE2E() {
   console.log("ValidatedVersionId:", finalProject.validatedVersionId);
   console.log("RuntimeTest Result:", finalProject.previewStatus === "READY" && finalProject.validatedVersionId ? "PASSED" : "FAILED/SKIPPED");
   console.log("FinalReview Result:", finalProject.validatedVersionId ? "PASSED" : "FAILED");
+  
+  // Verify validatedVersionId matches the actual version
+  if (finalProject.validatedVersionId && latestVersion) {
+    const match = finalProject.validatedVersionId === latestVersion.id;
+    console.log(`ValidatedVersionId matches latest version: ${match ? "YES ✅" : "NO ❌"}`);
+  }
   
   if (finalProject.status === "ready") {
     console.log("✅ GENERATION PASSED");
