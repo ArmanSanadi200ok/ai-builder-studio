@@ -19,9 +19,10 @@ async function runE2E() {
     userId: userId,
     name: "E2E Todo App",
     description: prompt,
+    applicationType: "WEB_APP",
     status: "generating",
     selectedProvider: "openrouter",
-    selectedModel: "openai/gpt-4o-mini",
+    selectedModel: "meta-llama/llama-3.1-70b-instruct",
   });
 
   console.log("Sending project/generate.requested event to Inngest...");
