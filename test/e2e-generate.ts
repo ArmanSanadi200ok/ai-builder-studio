@@ -20,8 +20,8 @@ async function runE2E() {
     name: "E2E Todo App",
     description: prompt,
     status: "generating",
-    selectedProvider: "groq",
-    selectedModel: "llama-3.1-70b-versatile",
+    selectedProvider: "openrouter",
+    selectedModel: "stealth/space-bunny-alpha",
   });
 
   console.log("Sending project/generate.requested event to Inngest...");

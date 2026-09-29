@@ -550,7 +550,7 @@ Output ONLY the raw file content. Do NOT wrap in markdown \`\`\` blocks.`;
           updatedAt: new Date()
         }).where(eq(projectJobs.id, job.id));
         
-        await db.update(projects).set({ status: "ready" }).where(eq(projects.id, projectId));
+        await db.update(projects).set({ status: "failed" }).where(eq(projects.id, projectId));
       });
     }
   }
