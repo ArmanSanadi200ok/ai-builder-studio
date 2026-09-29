@@ -111,7 +111,7 @@ export default async function ProvidersPage() {
             <span className="material-symbols-outlined text-[48px] text-on-surface-variant mb-4">vpn_key_off</span>
             <h3 className="font-headline-sm text-on-surface mb-2">No Providers Connected</h3>
             <p className="text-body-sm text-on-surface-variant mb-6">
-              You haven't configured any personal LLM API keys yet.
+              You haven&apos;t configured any personal LLM API keys yet.
             </p>
             <Link href="/dashboard/settings">
               <Button>Configure API Keys</Button>

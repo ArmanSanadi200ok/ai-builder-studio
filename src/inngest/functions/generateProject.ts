@@ -9,7 +9,9 @@ import { NonRetriableError } from "inngest";
 import { executeWithProviderChain } from "@/lib/ai/provider-chain";
 import { validateAndRepairProject } from "@/lib/projectValidator";
 import { preflightBuild } from "@/lib/projectBuilder";
-
+import { runRuntimeTest } from "@/lib/runtimeTest";
+import { finalReview } from "@/lib/finalReviewer";
+import { startPreviewSandbox } from "./startPreview";
 export const generateProject = inngest.createFunction(
   { 
     id: "generate-project", 
@@ -28,7 +30,7 @@ export const generateProject = inngest.createFunction(
   async ({ event, step }) => {
     const { projectId, userId, prompt, attachmentId, mode } = event.data;
 
-    const job = await step.run("initialize-job", async () => {
+    const jobData = await step.run("initialize-job", async () => {
       const project = await db.query.projects.findFirst({
         where: and(eq(projects.id, projectId), eq(projects.userId, userId)),
       });
@@ -58,8 +60,11 @@ export const generateProject = inngest.createFunction(
         .set({ status: "generating", description: project.description || prompt, activeProvider: selectedProvider, activeModel: selectedModel })
         .where(eq(projects.id, projectId));
 
-      return newJob;
+      return { newJob, applicationType: project.applicationType };
     });
+
+    const job = jobData.newJob;
+    const applicationType = jobData.applicationType;
 
     try {
       // Create Provider Chain
@@ -479,7 +484,7 @@ Output ONLY the raw file content. Do NOT wrap in markdown \`\`\` blocks.`;
 
       await step.run("finalize", async () => {
         const hasErrors = generatedFiles.some(f => f.error) || !buildPassed;
-        const finalStatus = hasErrors ? "GENERATED_WITH_ERRORS" : "COMPLETED";
+        const finalStatus: "GENERATED_WITH_ERRORS" | "COMPLETED" = hasErrors ? "GENERATED_WITH_ERRORS" : "COMPLETED";
         
         await db.update(projectJobs).set({ 
           status: finalStatus, 
@@ -489,9 +494,52 @@ Output ONLY the raw file content. Do NOT wrap in markdown \`\`\` blocks.`;
           updatedAt: new Date(),
         }).where(eq(projectJobs.id, job.id));
         
-        const finalProjectStatus = buildPassed ? "ready" : "failed";
-        await db.update(projects).set({ status: finalProjectStatus }).where(eq(projects.id, projectId));
+        if (!buildPassed) {
+          await db.update(projects).set({ status: "failed" }).where(eq(projects.id, projectId));
+        }
       });
+
+      if (buildPassed) {
+        if (applicationType === "WEB_APP") {
+          // Hard gate: Create Sandbox
+          await step.invoke("provision-sandbox", {
+            function: startPreviewSandbox,
+            data: { projectId, userId, versionId }
+          });
+
+          // Hard gate: Runtime Test and Final Review
+          await step.run("verify-and-validate", async () => {
+            const [runtimePassed, reviewResult] = await Promise.all([
+              runRuntimeTest(projectId),
+              finalReview(projectId, { 
+                 applicationType: applicationType as "WEB_APP" | "MOBILE_APP" | "WHATSAPP_BOT" | "MULTI_COMPONENT",
+                 intent: prompt,
+                 goal: "Generated automatically",
+                 features: [],
+                 inferredRequirements: [],
+                 requiredCapabilities: [],
+                 attachmentTypes: [],
+                 confidence: 1
+              })
+            ]);
+
+            const finalProjectStatus = (runtimePassed && reviewResult.passed) ? "ready" : "failed";
+            
+            await db.update(projects).set({ 
+              status: finalProjectStatus,
+              validatedVersionId: (runtimePassed && reviewResult.passed) ? versionId : null
+            }).where(eq(projects.id, projectId));
+          });
+        } else {
+          // Mobile apps bypass sandbox
+          await step.run("verify-and-validate", async () => {
+            await db.update(projects).set({ 
+              status: "ready",
+              validatedVersionId: versionId
+            }).where(eq(projects.id, projectId));
+          });
+        }
+      }
 
     } catch (error: unknown) {
       await step.run("handle-error", async () => {

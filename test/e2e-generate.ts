@@ -1,3 +1,5 @@
+import { config } from "dotenv";
+config({ path: ".env.local" });
 import { db } from "../src/db";
 import { projects, projectJobs } from "../src/db/schema/projects";
 import { inngest } from "../src/inngest/client";
@@ -18,8 +20,8 @@ async function runE2E() {
     name: "E2E Todo App",
     description: prompt,
     status: "generating",
-    selectedProvider: "cerebras",
-    selectedModel: "llama3.1-70b",
+    selectedProvider: "groq",
+    selectedModel: "llama-3.1-70b-versatile",
   });
 
   console.log("Sending project/generate.requested event to Inngest...");
@@ -70,7 +72,10 @@ async function runE2E() {
   console.log("SandboxId:", finalProject.sandboxId);
   console.log("SandboxName:", finalProject.sandboxName);
   console.log("PreviewUrl:", finalProject.previewUrl);
+  console.log("PreviewStatus:", finalProject.previewStatus);
   console.log("ValidatedVersionId:", finalProject.validatedVersionId);
+  console.log("RuntimeTest Result:", finalProject.previewStatus === "READY" && finalProject.validatedVersionId ? "PASSED" : "FAILED/SKIPPED");
+  console.log("FinalReview Result:", finalProject.validatedVersionId ? "PASSED" : "FAILED");
   
   if (finalProject.status === "ready") {
     console.log("✅ GENERATION PASSED");
