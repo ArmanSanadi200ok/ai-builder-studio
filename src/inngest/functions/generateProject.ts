@@ -35,8 +35,8 @@ export const generateProject = inngest.createFunction(
 
       if (!project) throw new Error("Project not found");
 
-      let selectedProvider = project.selectedProvider || "openai";
-      let selectedModel = project.selectedModel || "gpt-4o";
+      const selectedProvider = project.selectedProvider || "openai";
+      const selectedModel = project.selectedModel || "gpt-4o";
 
       const [newJob] = await db
         .insert(projectJobs)
@@ -64,8 +64,8 @@ export const generateProject = inngest.createFunction(
     try {
       // Create Provider Chain
       const providerChain = await step.run("build-provider-chain", async () => {
-        let initialProvider = job.selectedProvider || "openai";
-        let initialModel = job.selectedModel || "gpt-4o";
+        const initialProvider = job.selectedProvider || "openai";
+        const initialModel = job.selectedModel || "gpt-4o";
 
         const userKeys = await db.query.userApiKeys.findMany({
           where: eq(userApiKeys.userId, userId),
@@ -207,7 +207,13 @@ Output JSON format exactly like this (no markdown wrapping):
            "Analyzing requirements",
            "planning"
         );
-        let parsedPlan: any = {};
+        interface ParsedPlan {
+          applicationType?: "WEB_APP" | "MOBILE_APP" | "WHATSAPP_BOT" | "MULTI_COMPONENT";
+          projectType?: string;
+          framework?: string;
+          files?: { path: string; action?: string; description?: string; content?: string }[];
+        }
+        let parsedPlan: ParsedPlan = {};
         try {
            parsedPlan = JSON.parse(content);
         } catch (e) {
@@ -270,7 +276,7 @@ Output JSON format exactly like this (no markdown wrapping):
             return { path: file.path, success: true, action: "delete" };
           }
 
-          let filePrompt = "You are an expert developer implementing a project.\n" +
+          const filePrompt = "You are an expert developer implementing a project.\n" +
 "Project Request: " + prompt + (plan.contextText || "") + "\n" +
 "Your task is to write the complete content for the file: " + file.path + "\n" +
 "Description: " + file.description + "\n\n" +
@@ -278,7 +284,7 @@ Output JSON format exactly like this (no markdown wrapping):
 "Do NOT output markdown outside the JSON. Do NOT output chain-of-thought, thinking process, or conversational preamble.\n" +
 "Example JSON format:\n{\n  \"content\": \"raw file content goes here\"\n}";
 
-          let isJsonFormat = true;
+          const isJsonFormat = true;
 
           let attempt = 0;
           let finalContent = "";
@@ -307,8 +313,8 @@ Output JSON format exactly like this (no markdown wrapping):
               finalContent = parsed.content;
               if (typeof finalContent !== "string") throw new Error("JSON 'content' property must be a string");
               if (!finalContent.trim()) throw new Error("File content cannot be empty");
-            } catch (e: any) {
-              syntaxErrorMsg = "Failed to parse JSON response or missing 'content' property. " + e.message;
+            } catch (e: unknown) {
+              syntaxErrorMsg = "Failed to parse JSON response or missing 'content' property. " + (e as Error).message;
               attempt++;
               continue;
             }
@@ -332,18 +338,19 @@ Output JSON format exactly like this (no markdown wrapping):
                   syntaxErrorMsg = "HTML file does not contain valid HTML tags.";
                 }
               } else if (file.path.endsWith('.ts') || file.path.endsWith('.tsx') || file.path.endsWith('.js') || file.path.endsWith('.jsx')) {
-                const ts = require('typescript');
+                const tsModule = await import('typescript');
+                const ts = tsModule.default || tsModule;
                 try {
                   const result = ts.transpileModule(finalContent, {
                      compilerOptions: { jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2022 },
                      reportDiagnostics: true
                   });
-                  const errors = result.diagnostics?.filter((d: any) => d.category === ts.DiagnosticCategory.Error);
+                  const errors = result.diagnostics?.filter((d: { category: number }) => d.category === ts.DiagnosticCategory.Error);
                   if (errors && errors.length > 0) {
                      syntaxErrorMsg = ts.flattenDiagnosticMessageText(errors[0].messageText, '\n');
                   }
-                } catch (err: any) {
-                  syntaxErrorMsg = err.message;
+                } catch (err: unknown) {
+                  syntaxErrorMsg = (err as Error).message;
                 }
               } else if (file.path.endsWith('.css') || file.path.endsWith('.scss') || file.path.endsWith('.less')) {
                 if (!lowerContent.includes("{") || !lowerContent.includes("}")) {
@@ -383,7 +390,7 @@ Output JSON format exactly like this (no markdown wrapping):
           }
         });
         
-        generatedFiles.push({ path: file.path, error: (fileResult as any).error });
+        generatedFiles.push({ path: file.path, error: (fileResult as { error?: string }).error });
       }
 
       let buildPassed = false;
@@ -486,9 +493,9 @@ Output ONLY the raw file content. Do NOT wrap in markdown \`\`\` blocks.`;
         await db.update(projects).set({ status: finalProjectStatus }).where(eq(projects.id, projectId));
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       await step.run("handle-error", async () => {
-        const errorMsg = error instanceof NonRetriableError ? error.message : (error.message || String(error));
+        const errorMsg = error instanceof NonRetriableError ? error.message : ((error as Error).message || String(error));
         await db.update(projectJobs).set({ 
           status: "FAILED", 
           errorMessage: errorMsg,

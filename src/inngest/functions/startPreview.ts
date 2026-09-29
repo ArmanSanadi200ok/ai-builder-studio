@@ -24,14 +24,16 @@ function getProjectRootDir(files: { path: string }[]): string {
   return '';
 }
 
-async function safeSandboxOperation<T>(sandbox: any, op: () => Promise<T>): Promise<T> {
+async function safeSandboxOperation<T>(sandbox: { name?: string; delete?: () => Promise<void> } | unknown, op: () => Promise<T>): Promise<T> {
   try {
     return await op();
-  } catch (e: any) {
-    if (e.message?.includes('SANDBOX_STOPPED') || e.message?.includes('410') || String(e).includes('410') || String(e).includes('SANDBOX_STOPPED')) {
-      console.log(`[Preview] Detected unrecoverable sandbox ${sandbox.name}. Deleting to allow recreation.`);
-      try { await sandbox.delete(); } catch(deleteErr) {}
-      throw new Error(`Sandbox ${sandbox.name} was unrecoverable and has been deleted. Inngest will retry and create a fresh one.`);
+  } catch (e: unknown) {
+    const errorMsg = e instanceof Error ? e.message : String(e);
+    if (errorMsg.includes('SANDBOX_STOPPED') || errorMsg.includes('410')) {
+      const sbName = (sandbox as { name?: string })?.name || 'unknown';
+      console.log(`[Preview] Detected unrecoverable sandbox ${sbName}. Deleting to allow recreation.`);
+      try { await (sandbox as { delete?: () => Promise<void> })?.delete?.(); } catch {}
+      throw new Error(`Sandbox ${sbName} was unrecoverable and has been deleted. Inngest will retry and create a fresh one.`);
     }
     throw e;
   }
@@ -189,12 +191,12 @@ export const startPreviewSandbox = inngest.createFunction(
           if (res.ok || res.status === 404 || res.status === 403) {
             isReady = true;
           }
-        } catch (e) {
+        } catch {
           // Not ready
         }
         
-        let devCmd: any = null;
-        let crashResult: any = null;
+        let devCmd: { wait: () => Promise<unknown>, stdout: () => Promise<string>, stderr: () => Promise<string> } | null = null;
+        let crashResult: { exitCode?: number } | null = null;
         
         if (!isReady) {
           // Kill any dead/zombie process bound to the target port
@@ -224,14 +226,14 @@ export const startPreviewSandbox = inngest.createFunction(
           });
           
           // Listen for early crashes
-          devCmd.wait().then((res: any) => { crashResult = res; }).catch(() => {});
+          devCmd?.wait().then((res: unknown) => { crashResult = res as { exitCode?: number }; }).catch(() => {});
           
           // Proper readiness check with retries
           for (let i = 0; i < 30; i++) {
             if (crashResult) {
-              const stdout = await devCmd.stdout().catch(() => "");
-              const stderr = await devCmd.stderr().catch(() => "");
-              throw new Error(`Dev server crashed (Exit ${crashResult.exitCode}):\n${stderr}\n${stdout}`);
+              const stdout = await devCmd?.stdout().catch(() => "") || "";
+              const stderr = await devCmd?.stderr().catch(() => "") || "";
+              throw new Error(`Dev server crashed (Exit ${(crashResult as { exitCode?: number }).exitCode}):\n${stderr}\n${stdout}`);
             }
             
             try {
@@ -242,15 +244,16 @@ export const startPreviewSandbox = inngest.createFunction(
                 isReady = true;
                 break;
               }
-            } catch (e: any) {
-              if (e.message?.includes('unrecoverable')) throw e; // Let the safeSandboxOperation error propagate
+            } catch (e: unknown) {
+              const errorMsg = e instanceof Error ? e.message : String(e);
+              if (errorMsg.includes('unrecoverable')) throw e; // Let the safeSandboxOperation error propagate
             }
             await new Promise(r => setTimeout(r, 1000));
           }
           
           if (!isReady) {
-            const stdout = await devCmd.stdout().catch(() => "");
-            const stderr = await devCmd.stderr().catch(() => "");
+            const stdout = await devCmd?.stdout().catch(() => "") || "";
+            const stderr = await devCmd?.stderr().catch(() => "") || "";
             throw new Error(`Dev server failed to become ready on port ${targetPort}.\nLogs:\n${stderr}\n${stdout}`);
           }
         }
@@ -263,7 +266,7 @@ export const startPreviewSandbox = inngest.createFunction(
         }).where(eq(projects.id, projectId));
       });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       await step.run("handle-error", async () => {
         // If we threw our "unrecoverable" error, we do NOT want to mark it as FAILED if Inngest will retry it.
         // Wait, Inngest retries steps by default. If a step throws, it retries that step.
@@ -274,7 +277,7 @@ export const startPreviewSandbox = inngest.createFunction(
         // To fix this, we should throw a NonRetriableError, and let the user click "Retry Preview".
         // BUT wait, Inngest has a feature to retry the whole function? No.
         // Let's just fail it with a clean message so the user clicks "Retry Preview". The next time, it will create a fresh one!
-        let msg = error.message || String(error);
+        let msg = error instanceof Error ? error.message : String(error);
         if (msg.includes("was unrecoverable and has been deleted")) {
           msg = "Sandbox was in a stopped/unreachable state and has been reset. Please click Retry Preview to start a fresh environment.";
         }

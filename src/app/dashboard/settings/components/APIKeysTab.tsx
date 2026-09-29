@@ -27,8 +27,8 @@ export function APIKeysTab({ apiKeys }: { apiKeys: { provider: string; hasKey: b
       }
       alert("Provider saved and validated successfully.");
       setKey(""); // Clear input on success
-    } catch (err: any) {
-      alert("Failed to save provider: " + err.message);
+    } catch (err: unknown) {
+      alert("Failed to save provider: " + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -38,8 +38,8 @@ export function APIKeysTab({ apiKeys }: { apiKeys: { provider: string; hasKey: b
     if (!confirm(`Are you sure you want to remove the configuration for ${aiProviders[providerId]?.name}?`)) return;
     try {
       await deleteApiKey(providerId);
-    } catch (err: any) {
-      alert("Failed to remove: " + err.message);
+    } catch (err: unknown) {
+      alert("Failed to remove: " + (err as Error).message);
     }
   }
 

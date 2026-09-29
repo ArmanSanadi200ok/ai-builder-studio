@@ -32,7 +32,7 @@ export async function DashboardLayout({ children }: { children: React.ReactNode 
 
   return (
     <div className="flex h-screen overflow-hidden font-body-md text-body-md bg-surface-container-lowest">
-      <Topbar user={serializableUser} />
+      <Topbar />
       <Sidebar user={serializableUser} />
       <main className="flex-1 ml-0 md:ml-64 mt-[72px] md:mt-0 p-lg md:p-xl overflow-y-auto h-full">
         {children}

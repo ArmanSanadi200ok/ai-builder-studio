@@ -34,16 +34,17 @@ export async function GET(req: NextRequest) {
     let apiKey = "";
     try {
       apiKey = decryptKey(keyRecord.encryptedKey, keyRecord.iv);
-    } catch (e) {
+    } catch (e: unknown) {
+      console.error(e);
       return NextResponse.json({ error: "Failed to decrypt API key." }, { status: 500 });
     }
 
     const models = await getLiveModels(providerId, apiKey);
     return NextResponse.json({ models });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message || "Failed to fetch models" },
+      { error: (error as Error).message || "Failed to fetch models" },
       { status: 500 }
     );
   }

@@ -7,13 +7,12 @@ interface LivePreviewProps {
 }
 
 export function LivePreview({ files }: LivePreviewProps) {
-  const [srcDoc, setSrcDoc] = useState("");
   const [previewState, setPreviewState] = useState<"building" | "ready" | "failed">("building");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    setPreviewState("building");
+  const srcDoc = React.useMemo(() => generateSrcDoc(files), [files]);
 
+  useEffect(() => {
     const timer = setTimeout(() => {
       setPreviewState(prev => prev === "building" ? "failed" : prev);
     }, 10000);
@@ -30,9 +29,6 @@ export function LivePreview({ files }: LivePreviewProps) {
     };
     
     window.addEventListener("message", handleMessage);
-
-    const html = generateSrcDoc(files);
-    setSrcDoc(html);
 
     return () => {
       clearTimeout(timer);

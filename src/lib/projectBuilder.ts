@@ -38,7 +38,7 @@ export async function preflightBuild(versionId: string): Promise<{ success: bool
               // If there's no build script, treat it as success since we can't run build.
               return { success: true, framework: detectedFramework };
           }
-      } catch (e) {
+      } catch {
           console.error("Failed to parse package.json for build preflight");
       }
   } else {
@@ -65,18 +65,19 @@ export async function preflightBuild(versionId: string): Promise<{ success: bool
     await execAsync('npm run build', { cwd: tmpDir, timeout: 60000 });
     
     return { success: true, framework: detectedFramework };
-  } catch (error: any) {
-    let errorMsg = error.message || String(error);
-    if (error.stdout) errorMsg += `\nStdout:\n${error.stdout}`;
-    if (error.stderr) errorMsg += `\nStderr:\n${error.stderr}`;
+  } catch (error: unknown) {
+    const eObj = error as { message?: string, stdout?: string, stderr?: string };
+    let errorMsg = eObj.message || String(error);
+    if (eObj.stdout) errorMsg += `\nStdout:\n${eObj.stdout}`;
+    if (eObj.stderr) errorMsg += `\nStderr:\n${eObj.stderr}`;
     
     return { success: false, error: errorMsg, framework: detectedFramework };
   } finally {
     // Cleanup
     try {
       await fs.rm(tmpDir, { recursive: true, force: true });
-    } catch (e) {
-      console.error("Failed to cleanup temp directory", e);
+    } catch {
+      console.error("Failed to cleanup temp directory");
     }
   }
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { aiProviders } from "@/lib/ai/registry";
 
-export function AIPreferencesTab({ settings }: { settings: any }) {
+export function AIPreferencesTab({ settings }: { settings?: { defaultProvider?: string, defaultModel?: string, ollamaEndpoint?: string } }) {
   const [provider, setProvider] = useState(settings?.defaultProvider || "openai");
   const [model, setModel] = useState(settings?.defaultModel || "gpt-4o");
   const [ollamaEndpoint, setOllamaEndpoint] = useState(settings?.ollamaEndpoint || "http://localhost:11434");
@@ -34,7 +34,7 @@ export function AIPreferencesTab({ settings }: { settings: any }) {
     }
     fetchModels();
     return () => { active = false; };
-  }, [provider, ollamaEndpoint]);
+  }, [provider, ollamaEndpoint, model]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -42,8 +42,8 @@ export function AIPreferencesTab({ settings }: { settings: any }) {
     try {
       await updateUserSettings({ defaultProvider: provider, defaultModel: model, ollamaEndpoint });
       alert("AI Preferences saved");
-    } catch (err: any) {
-      alert("Error: " + err.message);
+    } catch (err: unknown) {
+      alert("Error: " + (err as Error).message);
     } finally {
       setLoading(false);
     }

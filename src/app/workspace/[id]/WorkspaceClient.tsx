@@ -7,6 +7,30 @@ import Link from "next/link";
 import { aiProviders } from "@/lib/ai/registry";
 import { LivePreview } from "@/components/preview/LivePreview";
 
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      [0]: { transcript: string };
+    };
+  };
+}
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+interface SpeechRecognitionType {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
 interface WorkspaceClientProps {
   project: {
     id: string;
@@ -46,7 +70,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   const [error, setError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [jobState, setJobState] = useState(initialJob);
-  const [attachment, setAttachment] = useState<any>(null);
+  const [attachment, setAttachment] = useState<{ id: string; filename: string } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   
@@ -57,17 +81,17 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
   });
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionType | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = (window as unknown as { SpeechRecognition: new () => SpeechRecognitionType, webkitSpeechRecognition: new () => SpeechRecognitionType }).SpeechRecognition || (window as unknown as { SpeechRecognition: new () => SpeechRecognitionType, webkitSpeechRecognition: new () => SpeechRecognitionType }).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
         let finalTranscript = '';
         let interimTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -82,7 +106,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
         }
       };
 
-      recognitionRef.current.onerror = (event: any) => {
+      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.error("Speech recognition error", event.error);
         setIsRecording(false);
       };
@@ -129,8 +153,8 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
 
       const data = await res.json();
       setAttachment(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to upload attachment");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to upload attachment");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -252,7 +276,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
       });
       // Set generating false immediately for optimistic UI
       setIsGenerating(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError("Unable to stop this generation. Please try again.");
     }
   };
@@ -282,7 +306,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
            window.open(`https://${data.url}`, '_blank');
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Diagnostics] Network or unexpected error:", err);
       setError("Deploy error. Please try again.");
     }
@@ -320,7 +344,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
     abortControllerRef.current = new AbortController();
 
     try {
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         projectId: project.id,
         prompt: userPrompt,
         regenerate
@@ -338,7 +362,7 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
       });
 
       if (!res.ok) {
-        let errText = await res.text();
+        const errText = await res.text();
         throw new Error(errText);
       }
 
@@ -380,10 +404,10 @@ export function WorkspaceClient({ project, initialMessages = [], initialJob = nu
       }
 
       setStatus("ready");
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
+    } catch (err: unknown) {
+      if ((err as Error).name !== "AbortError") {
         console.error("Generation error:", err);
-        let errorMsg = err.message || "An error occurred during generation";
+        let errorMsg = (err as Error).message || "An error occurred during generation";
         if (errorMsg.includes("400") || errorMsg.toLowerCase().includes("bad request")) {
           errorMsg = "Generation failed: The conversation sequence became unsynchronized. Please try sending your prompt again.";
         }

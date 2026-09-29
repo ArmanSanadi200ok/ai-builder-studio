@@ -5,7 +5,7 @@ import { AIPreferencesTab } from "./AIPreferencesTab";
 import { APIKeysTab } from "./APIKeysTab";
 import { IntegrationsTab } from "./IntegrationsTab";
 
-export function SettingsTabs({ settings, apiKeys, integrations, isGithubConnected = false, envConfigured = { github: false, vercel: false } }: { settings: any, apiKeys: any[], integrations: any[], isGithubConnected?: boolean, envConfigured?: { github: boolean, vercel: boolean } }) {
+export function SettingsTabs({ settings, apiKeys, integrations, isGithubConnected = false, envConfigured = { github: false, vercel: false } }: { settings: Record<string, unknown>, apiKeys: { provider: string; hasKey: boolean; }[], integrations: { provider: string; }[], isGithubConnected?: boolean, envConfigured?: { github: boolean, vercel: boolean } }) {
   const [activeTab, setActiveTab] = useState("ai-preferences");
 
   const tabs = [

@@ -16,8 +16,8 @@ export function ProfileForm() {
       await deleteAccount();
       // Redirect to home since session is gone
       router.push("/");
-    } catch (err: any) {
-      alert("Failed to delete account: " + err.message);
+    } catch (err: unknown) {
+      alert("Failed to delete account: " + (err as Error).message);
       setDeleteLoading(false);
     }
   }

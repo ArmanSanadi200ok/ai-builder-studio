@@ -66,9 +66,9 @@ export async function POST(req: Request) {
           mode: mode,
         },
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Inngest send error:", err);
-      return new Response(`Failed to start generation: ${err.message}`, { status: 500 });
+      return new Response(`Failed to start generation: ${(err as Error).message}`, { status: 500 });
     }
 
     // Stream a message back to the UI indicating background generation has started
@@ -92,8 +92,8 @@ export async function POST(req: Request) {
       }
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Generate API error:", err);
-    return new Response(`Error: ${err.message}`, { status: 500 });
+    return new Response(`Error: ${(err as Error).message}`, { status: 500 });
   }
 }

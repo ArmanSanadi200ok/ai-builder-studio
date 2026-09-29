@@ -136,9 +136,9 @@ export async function GET(req: Request) {
         console.error("Vercel Integration Token Exchange failed:", response.status, errData);
         return new Response(`Failed to exchange token: ${errData}`, { status: response.status });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Token exchange exception:", err);
-      return new Response(`Error during token exchange: ${err.message}`, { status: 500 });
+      return new Response(`Error during token exchange: ${(err as Error).message}`, { status: 500 });
     }
 
     if (redirectDestination) {
@@ -210,9 +210,9 @@ export async function GET(req: Request) {
         console.error("Token exchange failed:", response.status, errData);
         return new Response(`Failed to exchange token: ${errData}`, { status: response.status });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Token exchange error:", err);
-      return new Response(`Error exchanging token: ${err.message}`, { status: 500 });
+      return new Response(`Error exchanging token: ${(err as Error).message}`, { status: 500 });
     }
   }
 }

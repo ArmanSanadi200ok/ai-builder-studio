@@ -25,8 +25,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       headers: { "Content-Type": "application/json" }
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Fetch job error:", err);
-    return new Response(`Error: ${err.message}`, { status: 500 });
+    return new Response(`Error: ${(err as Error).message}`, { status: 500 });
   }
 }

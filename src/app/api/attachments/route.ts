@@ -77,8 +77,8 @@ export async function POST(req: Request) {
     }).returning();
 
     return new Response(JSON.stringify(attachment), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Attachment upload error:", err);
-    return new Response(`Upload error: ${err.message}`, { status: 500 });
+    return new Response(`Upload error: ${(err as Error).message}`, { status: 500 });
   }
 }

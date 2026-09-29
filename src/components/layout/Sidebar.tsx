@@ -17,7 +17,7 @@ const navItems: NavItem[] = [
   { href: "/dashboard/providers", icon: "hub", label: "Providers" },
 ];
 
-export function Sidebar({ user }: { user?: any }) {
+export function Sidebar({ user }: { user?: { name?: string | null, email?: string | null, image?: string | null } }) {
   const pathname = usePathname();
 
   return (

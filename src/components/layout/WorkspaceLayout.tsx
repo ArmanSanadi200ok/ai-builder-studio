@@ -6,7 +6,7 @@ import { aiProviders } from "@/lib/ai/registry";
 
 interface WorkspaceLayoutProps {
   children: React.ReactNode;
-  project: any;
+  project: { selectedProvider?: string; status?: string; name?: string; id?: string; domain?: string } | null;
 }
 
 export function WorkspaceLayout({ children, project }: WorkspaceLayoutProps) {

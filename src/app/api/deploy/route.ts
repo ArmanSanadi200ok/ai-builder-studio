@@ -61,6 +61,13 @@ export async function POST(req: Request) {
     if (!latestVersion) {
       return new Response("Project has no versions to deploy", { status: 404 });
     }
+    // Deployment guard: ensure only ready projects with validated version are deployed
+    if (project.status !== "ready") {
+      return new Response(`Project status is '${project.status}'. Deployment allowed only when status is 'ready'.`, { status: 400 });
+    }
+    if (latestVersion.id !== project.validatedVersionId) {
+      return new Response(`Latest version (${latestVersion.id}) is not the validated version (${project.validatedVersionId}). Deployment rejected.`, { status: 400 });
+    }
 
     const files = await db.query.projectFiles.findMany({
       where: eq(projectFiles.versionId, latestVersion.id)
@@ -214,7 +221,7 @@ export async function POST(req: Request) {
     }).where(eq(projects.id, projectId));
 
     return new Response(JSON.stringify({ url: deployData.url }), { status: 200, headers: { "Content-Type": "application/json" } });
-  } catch (err: any) {
-    return new Response(`Deploy error: ${err.message}`, { status: 500 });
+  } catch (err: unknown) {
+    return new Response(`Deploy error: ${(err as Error).message}`, { status: 500 });
   }
 }

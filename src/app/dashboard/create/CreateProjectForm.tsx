@@ -12,6 +12,30 @@ export interface ProviderOption {
   defaultModels: string[];
 }
 
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: {
+    length: number;
+    [index: number]: {
+      isFinal: boolean;
+      [0]: { transcript: string };
+    };
+  };
+}
+interface SpeechRecognitionErrorEvent {
+  error: string;
+}
+interface SpeechRecognitionType {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
 interface CreateProjectFormProps {
   personalProviders: ProviderOption[];
   absProviders: ProviderOption[];
@@ -49,17 +73,17 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
   const [isUploading, setIsUploading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const recognitionRef = React.useRef<any>(null);
+  const recognitionRef = React.useRef<SpeechRecognitionType | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognition = (window as unknown as { SpeechRecognition: new () => SpeechRecognitionType, webkitSpeechRecognition: new () => SpeechRecognitionType }).SpeechRecognition || (window as unknown as { SpeechRecognition: new () => SpeechRecognitionType, webkitSpeechRecognition: new () => SpeechRecognitionType }).webkitSpeechRecognition;
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
 
-      recognitionRef.current.onresult = (event: any) => {
+      recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
         let finalTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
@@ -71,7 +95,7 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
         }
       };
 
-      recognitionRef.current.onerror = (event: any) => {
+      recognitionRef.current.onerror = (event: SpeechRecognitionErrorEvent) => {
         setIsRecording(false);
       };
 
@@ -114,7 +138,7 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
           setAvailableModels(data.models || []);
           if (data.models && data.models.length > 0) {
             // Find a valid fallback model if the currently selected model isn't in the list
-            const currentModelValid = data.models.find((m: any) => m.id === model);
+            const currentModelValid = data.models.find((m: { id: string }) => m.id === model);
             if (!currentModelValid) {
               setModel(data.models[0].id);
             }
@@ -122,9 +146,9 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
             setProviderError("No models found for this provider.");
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (active) {
-          setProviderError(err.message);
+          setProviderError((err as Error).message);
         }
       } finally {
         if (active) {
@@ -135,7 +159,7 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
     
     fetchModels();
     return () => { active = false; };
-  }, [provider]);
+  }, [provider, model]);
 
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
@@ -177,8 +201,8 @@ export function CreateProjectForm({ personalProviders, absProviders, defaultProv
       }
 
       router.push(`/workspace/${result.projectId}`);
-    } catch (err: any) {
-      alert(err.message || "Failed to generate project");
+    } catch (err: unknown) {
+      alert((err as Error).message || "Failed to generate project");
       setLoading(false);
       setIsUploading(false);
     }

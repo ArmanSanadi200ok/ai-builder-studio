@@ -30,7 +30,7 @@ export default async function DashboardPage() {
         <h1 className="font-headline-md text-headline-md text-on-surface">
           Welcome back, {user?.name || "Developer"}
         </h1>
-        <p className="font-body-md text-body-md text-on-surface-variant mt-1">Here's what's happening with your projects today.</p>
+        <p className="font-body-md text-body-md text-on-surface-variant mt-1">Here&apos;s what&apos;s happening with your projects today.</p>
       </header>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-md">

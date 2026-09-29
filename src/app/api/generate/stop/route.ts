@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     });
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Stop generation error:", err);
     return new Response("Unable to stop this generation. Please try again.", { status: 500 });
   }

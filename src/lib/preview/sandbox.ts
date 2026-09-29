@@ -83,7 +83,7 @@ export function detectProjectFramework(files: { path: string, content: string }[
     if (deps["react-scripts"]) return "cra";
     
     return "node";
-  } catch(e) {
+  } catch {
     return "static";
   }
 }
@@ -98,7 +98,7 @@ export function getDevCommand(packageManager: string, framework: string, files: 
       const pkg = JSON.parse(packageJsonFile.content);
       if (pkg.scripts?.dev) hasDevScript = true;
       if (pkg.scripts?.start) hasStartScript = true;
-    } catch(e) {}
+    } catch {}
   }
 
   // Bind to 0.0.0.0

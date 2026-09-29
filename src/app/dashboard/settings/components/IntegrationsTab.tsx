@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
 import { signIn } from "next-auth/react";
@@ -31,11 +32,11 @@ export function IntegrationsTab({ integrations, isGithubConnected = false, envCo
               </span>
             </div>
             {envConfigured.vercel && (
-              <a href="/api/auth/vercel/integration">
+              <Link href="/api/auth/vercel/integration">
                 <Button variant="secondary">
                   {hasVercel ? "Reconnect Vercel" : "Connect Vercel"}
                 </Button>
-              </a>
+              </Link>
             )}
           </div>
           {!envConfigured.vercel && (

@@ -19,7 +19,7 @@ export interface AIProviderConfig {
   getModels?: (key: string, endpoint?: string) => Promise<ProviderModel[]>;
 }
 
-async function handleFetchTest(url: string, headers: any): Promise<{ valid: boolean; error?: string }> {
+async function handleFetchTest(url: string, headers: Record<string, string>): Promise<{ valid: boolean; error?: string }> {
   try {
     const res = await fetch(url, { headers });
     if (res.ok) return { valid: true };
@@ -28,11 +28,11 @@ async function handleFetchTest(url: string, headers: any): Promise<{ valid: bool
     try {
       const j = JSON.parse(errText);
       errText = j.error?.message || j.message || errText;
-    } catch (e) {}
+    } catch {}
     
     return { valid: false, error: `HTTP ${res.status}: ${errText.slice(0, 150)}` };
-  } catch (err: any) {
-    return { valid: false, error: err.message || "Network error" };
+  } catch (err: unknown) {
+    return { valid: false, error: err instanceof Error ? err.message : "Network error" };
   }
 }
 
@@ -77,13 +77,13 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch("https://api.openai.com/v1/models", { headers: { Authorization: `Bearer ${key}` } });
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.data || []).map((m: any) => ({
+        return (data.data || []).map((m: { id: string }) => ({
           id: m.id,
           name: m.id,
           provider: "openai",
           isAvailable: true,
           supportsResponseFormat: true,
-        })).filter((m: any) => m.id.includes("gpt"));
+        })).filter((m: { id: string }) => m.id.includes("gpt"));
       } catch { return []; }
     }
   },
@@ -102,8 +102,8 @@ export const aiProviders: Record<string, AIProviderConfig> = {
           return { valid: false, error: `HTTP ${res.status}` };
         }
         return { valid: true };
-      } catch (err: any) {
-        return { valid: false, error: err.message };
+      } catch (err: unknown) {
+        return { valid: false, error: err instanceof Error ? err.message : "Network error" };
       }
     },
     getModels: async (key: string) => {
@@ -111,7 +111,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch("https://api.anthropic.com/v1/models", { headers: { "x-api-key": key, "anthropic-version": "2023-06-01" } });
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.data || []).map((m: any) => ({
+        return (data.data || []).map((m: { id: string; display_name?: string }) => ({
           id: m.id,
           name: m.display_name || m.id,
           provider: "anthropic",
@@ -138,12 +138,12 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.models || []).map((m: any) => ({
+        return (data.models || []).map((m: { name: string; displayName: string }) => ({
           id: m.name.replace('models/', ''),
           name: m.displayName,
           provider: "google",
           isAvailable: true,
-        })).filter((m: any) => m.id.includes("gemini"));
+        })).filter((m: { id: string }) => m.id.includes("gemini"));
       } catch { return []; }
     }
   },
@@ -160,8 +160,8 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         if (!res.ok) return [];
         const data = await res.json();
         return (data.data || [])
-          .filter((m: any) => !m.id.includes("whisper") && !m.id.includes("audio"))
-          .map((m: any) => ({
+          .filter((m: { id: string }) => !m.id.includes("whisper") && !m.id.includes("audio"))
+          .map((m: { id: string }) => ({
             id: m.id,
             name: m.id,
             provider: "groq",
@@ -183,7 +183,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch("https://openrouter.ai/api/v1/models", { headers: { Authorization: `Bearer ${key}` } });
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.data || []).map((m: any) => ({
+        return (data.data || []).map((m: { id: string; name: string; pricing?: { prompt: string; completion: string }; supported_parameters?: string[] }) => ({
           id: m.id,
           name: m.name,
           provider: "openrouter",
@@ -206,7 +206,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch("https://api.deepseek.com/models", { headers: { Authorization: `Bearer ${key}` } });
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.data || []).map((m: any) => ({
+        return (data.data || []).map((m: { id: string }) => ({
           id: m.id,
           name: m.id,
           provider: "deepseek",
@@ -228,7 +228,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch("https://api.mistral.ai/v1/models", { headers: { Authorization: `Bearer ${key}` } });
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.data || []).map((m: any) => ({
+        return (data.data || []).map((m: { id: string }) => ({
           id: m.id,
           name: m.id,
           provider: "mistral",
@@ -250,7 +250,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch("https://api.cerebras.ai/v1/models", { headers: { Authorization: `Bearer ${key}` } });
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.data || []).map((m: any) => ({
+        return (data.data || []).map((m: { id: string }) => ({
           id: m.id,
           name: m.id,
           provider: "cerebras",
@@ -271,7 +271,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch("https://api.together.xyz/v1/models", { headers: { Authorization: `Bearer ${key}` } });
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.data || []).filter((m: any) => m.type === "chat").map((m: any) => ({
+        return (data.data || []).filter((m: { type: string }) => m.type === "chat").map((m: { id: string; display_name?: string }) => ({
           id: m.id,
           name: m.display_name || m.id,
           provider: "together",
@@ -291,8 +291,8 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch(`${endpoint.replace(/\/$/, '')}/api/tags`);
         if (res.ok) return { valid: true };
         return { valid: false, error: `HTTP ${res.status}` };
-      } catch (err: any) {
-        return { valid: false, error: err.message || "Network error" };
+      } catch (err: unknown) {
+        return { valid: false, error: err instanceof Error ? err.message : "Network error" };
       }
     },
     getModels: async (_, endpoint: string = "http://localhost:11434") => {
@@ -300,7 +300,7 @@ export const aiProviders: Record<string, AIProviderConfig> = {
         const res = await fetch(`${endpoint.replace(/\/$/, '')}/api/tags`);
         if (!res.ok) return [];
         const data = await res.json();
-        return (data.models || []).map((m: any) => ({
+        return (data.models || []).map((m: { name: string }) => ({
           id: m.name,
           name: m.name,
           provider: "ollama",

@@ -5,7 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { decryptKey } from "@/lib/encryption";
 import { aiProviders, getLiveModels, ProviderModel } from "@/lib/ai/registry";
 import { NonRetriableError } from "inngest";
-
+export type ProviderChain = { providerId: string; modelId: string }[];
 export type AttemptRecord = {
   provider: string;
   model: string;
@@ -28,7 +28,7 @@ export async function getDecryptedKey(providerId: string, userId: string): Promi
   
   try {
     return decryptKey(keyRecord.encryptedKey, keyRecord.iv);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -45,7 +45,7 @@ export async function makeProviderRequest(providerId: string, modelId: string, a
     throw { message: `${aiProviders[providerId]?.name} is not currently supported for background generation.`, status: 400 };
   }
 
-  const payload: any = {
+  const payload: { model: string; messages: { role: string; content: string }[]; response_format?: { type: string } } = {
     model: modelId,
     messages: [{ role: "user", content: userPrompt }],
   };
@@ -76,7 +76,7 @@ export async function makeProviderRequest(providerId: string, modelId: string, a
         const j = JSON.parse(errorText);
         errorCode = j.error?.code || j.error?.type || errorCode;
         errorText = j.error?.message || errorText;
-      } catch (e) {}
+      } catch {}
       
       throw { message: errorText, status: res.status, code: errorCode };
     }
@@ -90,9 +90,10 @@ export async function makeProviderRequest(providerId: string, modelId: string, a
       content = lines.join("\n");
     }
     return content;
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeoutId);
-    if (err.name === 'AbortError' || err.message === 'Request Timeout') {
+    const errorObj = err as { name?: string; message?: string };
+    if (errorObj.name === 'AbortError' || errorObj.message === 'Request Timeout') {
         throw { message: "Upstream provider timed out after 40s", status: 408, code: "timeout" };
     }
     throw err;
@@ -124,8 +125,9 @@ export async function executeWithProviderChain(
        throw new NonRetriableError(`Generation exceeded safety timeout of 3 minutes. Please try again.`);
     }
 
-    let { providerId, modelId } = providerChain[currentProviderIndex];
-    let apiKey = await getDecryptedKey(providerId, userId);
+    const providerId = providerChain[currentProviderIndex].providerId;
+    let modelId = providerChain[currentProviderIndex].modelId;
+    const apiKey = await getDecryptedKey(providerId, userId);
     
     if (apiKey === null) {
       currentProviderIndex++;
@@ -159,7 +161,7 @@ export async function executeWithProviderChain(
         let liveModels: ProviderModel[] = [];
         try {
           liveModels = await getLiveModels(providerId, apiKey as string);
-        } catch (e) {}
+        } catch {}
         const modelInfo = liveModels.find(m => m.id === modelId);
         const supportsResponseFormat = modelInfo?.supportsResponseFormat !== false;
 
@@ -169,7 +171,6 @@ export async function executeWithProviderChain(
         console.log(`[Timing] ${projectId} | ${jobId} | ${providerId} | ${modelId} | ${stage} | Start: ${iterationStartTime} | End: ${Date.now()} | Duration: ${iterationDurationMs}ms | Status: 200 | Result: completed`);
 
         if (isJson) {
-           let rawContent = content;
            if (content !== null && content !== undefined) {
              const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
              if (jsonMatch) {
@@ -187,8 +188,9 @@ export async function executeWithProviderChain(
              if (parsed === null || typeof parsed !== 'object') {
                throw new Error("Parsed JSON was not an object");
              }
-           } catch (e: any) {
-             throw { message: `Malformed JSON: ${e.message}`, status: 400, code: "malformed_json" };
+           } catch (e: unknown) {
+             const errorMsg = e instanceof Error ? e.message : String(e);
+             throw { message: `Malformed JSON: ${errorMsg}`, status: 400, code: "malformed_json" };
            }
         }
         
@@ -205,11 +207,12 @@ export async function executeWithProviderChain(
         
         return { content, providerId, modelId };
 
-      } catch (err: any) {
+      } catch (err: unknown) {
         attempt++;
-        const status = err.status || 500;
-        const msg = err.message || String(err);
-        const code = err.code || "unknown";
+        const errorObj = err as { status?: number; message?: string; code?: string };
+        const status = errorObj.status || 500;
+        const msg = errorObj.message || String(err);
+        const code = errorObj.code || "unknown";
         
         const iterationDurationMs = Date.now() - iterationStartTime;
         console.log(`[Timing] ${projectId} | ${jobId} | ${providerId} | ${modelId} | ${stage} | Start: ${iterationStartTime} | End: ${Date.now()} | Duration: ${iterationDurationMs}ms | Status: ${status} | Result: threw (${code})`);
@@ -242,7 +245,7 @@ export async function executeWithProviderChain(
                modelId = available[0].id;
                continue; 
              }
-           } catch (e) {}
+           } catch {}
            record.result = "fallback";
            attemptHistory.push(record);
            providerExhausted = true;
