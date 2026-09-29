@@ -59,7 +59,7 @@ export async function preflightBuild(versionId: string): Promise<{ success: bool
     }
 
     // Run npm install
-    await execAsync('npm install --no-fund --no-audit', { cwd: tmpDir, timeout: 60000 });
+    await execAsync(`npm install --no-fund --no-audit --cache=${path.join(tmpDir, '.npm')}`, { cwd: tmpDir, timeout: 60000 });
     
     // Run npm run build
     await execAsync('npm run build', { cwd: tmpDir, timeout: 60000 });

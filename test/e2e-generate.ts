@@ -21,7 +21,7 @@ async function runE2E() {
     description: prompt,
     status: "generating",
     selectedProvider: "openrouter",
-    selectedModel: "stealth/space-bunny-alpha",
+    selectedModel: "openai/gpt-4o-mini",
   });
 
   console.log("Sending project/generate.requested event to Inngest...");
